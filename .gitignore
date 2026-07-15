@@ -9,6 +9,7 @@ venv/
 
 # Workspace/runtime files that are not part of the app.
 .openclaw/
+logs/
 memory/
 *_extracted.txt
 AGENTS.md
