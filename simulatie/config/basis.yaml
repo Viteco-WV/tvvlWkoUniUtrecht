@@ -20,8 +20,6 @@ cop:
   deellast: [[0.14, 1.018], [1.0, 1.0], [1.2, 0.97], [1.28, 0.948]]  # [afgeleid] PLR t.o.v. nominaal -> factor
 
 temperatuur:
-  modus: stooklijn                                             # stooklijn | vraaggestuurd
-  voorregeling_k: 3                                            # [aanname] aanvoer boven buistemperatuur (vraaggestuurd)
   stooklijn:                                                   # [aanname] T_buiten -> T_aanvoer
     ht: [[-10, 65], [15, 55]]
     lt: [[-10, 45], [15, 35]]
@@ -59,7 +57,6 @@ strategie:
   naam: referentie
   referentie:
     soc_doel: 1.0                                              # buffer vol houden (back-up), laden met HT-restcapaciteit
-    min_last_via_buffer: false                                 # vereenvoudigd (29-09-2026): WP's volgen de vraag, pendelen blijft KPI
   congestie:
     reductie_kwe: 100                                          # [aanname] gevraagde verlaging in het venster
     alles_uit: false                                           # true = WP's volledig uit in het venster

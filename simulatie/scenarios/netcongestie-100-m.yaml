@@ -1,0 +1,45 @@
+id: netcongestie-100-m
+naam: Netcongestie 100 m³
+omschrijving: Als 200 m³, maar buffer 100 m³
+aangemaakt: '2026-10-26T00:00:00'
+gewijzigd: '2026-10-26T00:00:00'
+waarden:
+  strategie.naam: congestie
+  congestie.uren_lokaal:
+  - 8
+  - 17
+  congestie.maanden:
+  - 11
+  - 12
+  - 1
+  - 2
+  - 3
+  congestie.alleen_werkdagen: true
+  strategie.congestie.alles_uit: true
+  strategie.congestie.reductie_kwe: 100
+  strategie.congestie.adaptief: true
+  buffer.volume_m3: 100
+  buffer.t_laad_c: 67
+  buffer.t_retour_c: 35
+  buffer.p_max_kw: 880
+  buffer.dt_wisselaar_k: 2
+  buffer.ua_kw_per_k: 0.07
+  buffer.soc_start: 1.0
+  warmtepompen.ht.aantal: 2
+  warmtepompen.ht.p_max_kw: 205
+  warmtepompen.ht.p_min_kw: 103
+  warmtepompen.lt.aantal: 1
+  warmtepompen.lt.p_max_kw: 105
+  warmtepompen.lt.p_min_kw: 53
+  cop.eta_carnot: 0.55
+  cop.t_verdamper_c: 6.0
+  stooklijn.ht.m10: 65
+  stooklijn.ht.p15: 55
+  stooklijn.lt.m10: 45
+  stooklijn.lt.p15: 35
+  tarieven.kwmax_eur_kw_maand: 5.2943
+  tarieven.inkoop_winter_eur_kwh: 0.087
+  tarieven.inkoop_zomer_eur_kwh: 0.087
+  tarieven.opslag_piek_eur_kwh: 0.0
+  tarieven.opslag_dal_eur_kwh: 0.0
+  tarieven.energiebelasting_eur_kwh: 0.0

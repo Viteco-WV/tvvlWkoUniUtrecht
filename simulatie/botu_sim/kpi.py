@@ -1,5 +1,7 @@
 import numpy as np
 
+from .componenten import cop
+
 
 def _mwh(x):
     return round(float(x.sum()) / 1000, 1)
@@ -53,7 +55,7 @@ def bereken(res, cfg):
         },
         "bron": {"verdamper_mwh": round(float(warmte_wp - el.sum()) / 1000, 1)},
         "kosten": {
-            "inkoop_vast_eur": round(float((el * prijs).sum())),           # UU-contract: seizoen + opslag piek/dal + EB
+            "inkoop_vast_eur": round(float((el * prijs).sum())),           # vast contract: seizoenstarief + opslag piek/dal + EB
             "gem_prijs_eur_kwh": round(float((el * prijs).sum() / el.sum()), 4),
             "kwmax_wp_maandpieken_eur": round(float(piek_maand.sum() * t["kwmax_eur_kw_maand"])),
             "inkoop_dayahead_2024_eur": round(float((el * res["prijs_2024"]).sum())),
@@ -76,3 +78,19 @@ def bod_vergelijking(k):
         ("Bufferverlies", 1, k["buffer"]["verlies_mwh"]),
         ("Bron → verdampers", 1086, k["bron"]["verdamper_mwh"]),
     ]
+
+
+def max_vermogen(cfg):
+    """Maximaal elektrisch vermogen dat de WP's samen kunnen vragen: alle WP's op p_max bij de slechtste COP
+    (HT: hoogste van buffer laden en top stooklijn; LT: top stooklijn). Per groep en totaal, in kWe."""
+    uit = {}
+    for net in ("ht", "lt"):
+        wp = cfg["warmtepompen"][net]
+        t = max(p[1] for p in cfg["temperatuur"]["stooklijn"][net])
+        if net == "ht":
+            t = max(t, cfg["buffer"]["t_laad_c"] + cfg["buffer"]["dt_wisselaar_k"])
+        c = cop(t, wp["p_max_kw"], wp, cfg["cop"])
+        uit[net] = {"kwe": round(wp["aantal"] * wp["p_max_kw"] / c, 1), "t_c": t, "cop": round(float(c), 2)}
+    uit["totaal_kwe"] = round(uit["ht"]["kwe"] + uit["lt"]["kwe"], 1)
+    return uit
+

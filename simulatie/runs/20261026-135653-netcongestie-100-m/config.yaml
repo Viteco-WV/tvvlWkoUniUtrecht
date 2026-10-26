@@ -1,0 +1,89 @@
+naam: basis
+data:
+  warmte_netten: data/warmte/warmtedata_netten_2001.csv
+  klimaat: data/klimaat/klimaatdata_knmi_debilt_samengesteld.csv
+  condensor: data/warmte/condensorwarmte_zlt_2001.csv
+  prijzen: data/prijzen/dayahead_nl_op_simulatiejaar.csv
+warmtepompen:
+  ht:
+    aantal: 2
+    p_max_kw: 205
+    p_min_kw: 103
+  lt:
+    aantal: 1
+    p_max_kw: 105
+    p_min_kw: 53
+cop:
+  eta_carnot: 0.55
+  t_verdamper_c: 6.0
+  p_max_tov_nominaal: 1.28
+  deellast:
+  - - 0.14
+    - 1.018
+  - - 1.0
+    - 1.0
+  - - 1.2
+    - 0.97
+  - - 1.28
+    - 0.948
+temperatuur:
+  stooklijn:
+    ht:
+    - - -10
+      - 65.0
+    - - 15
+      - 55.0
+    lt:
+    - - -10
+      - 45.0
+    - - 15
+      - 35.0
+buffer:
+  volume_m3: 100
+  t_laad_c: 67
+  t_retour_c: 35
+  dt_wisselaar_k: 2
+  p_max_kw: 880
+  ua_kw_per_k: 0.07
+  ua_referentie_m3: 200
+  soc_start: 1.0
+condensor_zlt: true
+tarieven:
+  kwmax_eur_kw_maand: 5.2943
+  kwmax_stijging_pct_jaar: 0
+  inkoop_winter_eur_kwh: 0.087
+  inkoop_zomer_eur_kwh: 0.087
+  winter_maanden:
+  - 10
+  - 11
+  - 12
+  - 1
+  - 2
+  - 3
+  opslag_piek_eur_kwh: 0.0
+  opslag_dal_eur_kwh: 0.0
+  piekuren_lokaal:
+  - 7
+  - 23
+  energiebelasting_eur_kwh: 0.0
+congestie:
+  maanden:
+  - 11
+  - 12
+  - 1
+  - 2
+  - 3
+  uren_lokaal:
+  - 8
+  - 17
+  alleen_werkdagen: true
+  utc_offset_h: 1
+strategie:
+  naam: congestie
+  referentie:
+    soc_doel: 1.0
+  congestie:
+    reductie_kwe: 100
+    alles_uit: true
+    adaptief: true
+    veiligheid: 0.95

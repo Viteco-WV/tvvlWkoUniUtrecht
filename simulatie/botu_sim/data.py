@@ -18,8 +18,6 @@ def laad_invoer(cfg):
         "t": pd.to_datetime(w["timestamp_2001"]),
         "q_ht": w["ht_kwh"].values,
         "q_lt": w["lt_kwh"].values,
-        "tbuis_ht": w["ht_tbuis_max_c"].values,
-        "tbuis_lt": w["lt_tbuis_max_c"].values,
         "t_buiten": k["buitentemperatuur_c"].values,
         "zon": (k["zonnestraling_wh_m2"] if "zonnestraling_wh_m2" in k else k["globale_straling_w_m2"]).values,  # NEN of KNMI
         "q_cond": c["condensor_zlt_kwh"].values if cfg.get("condensor_zlt", True) else 0.0,
@@ -39,12 +37,6 @@ def laad_invoer(cfg):
 
 
 def aanvoertemperatuur(cfg, df, net):
-    tc = cfg["temperatuur"]
-    punten = np.array(tc["stooklijn"][net], dtype=float)
-    stook = np.interp(df["t_buiten"].values, punten[:, 0], punten[:, 1])  # np.interp begrenst buiten het bereik
-    if tc["modus"] == "stooklijn":
-        return stook
-    if tc["modus"] == "vraaggestuurd":
-        eis = df[f"tbuis_{net}"].values + tc["voorregeling_k"]
-        return np.minimum(eis, punten[:, 1].max())
-    raise ValueError(f"onbekende temperatuurmodus {tc['modus']}")
+    """Aanvoertemperatuur volgens de stooklijn van het net (buiten het bereik begrensd)."""
+    punten = np.array(cfg["temperatuur"]["stooklijn"][net], dtype=float)
+    return np.interp(df["t_buiten"].values, punten[:, 0], punten[:, 1])

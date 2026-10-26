@@ -13,11 +13,12 @@ from pathlib import Path
 
 import yaml
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from botu_sim.config import laad_config
+from botu_sim.kpi import max_vermogen
 from . import rekenen, schema
 
 HIER = Path(__file__).parent
@@ -49,6 +50,14 @@ def index():
 
 
 # ------------------------------------------------------------------ invoer
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    p = HIER / "static/img/favicon.ico"   # UU-beeldmerk; niet in de openbare versie
+    if not p.exists():
+        raise HTTPException(404)
+    return FileResponse(p, media_type="image/x-icon")
+
+
 @app.get("/api/schema")
 def get_schema():
     return {"groepen": schema.GROEPEN, "maanden": schema.MAANDEN, "basis": schema.waarden_uit_config(BASIS)}
@@ -97,8 +106,12 @@ def nieuw_scenario(s: Scenario):
 
 @app.delete("/api/scenarios/{sid}")
 def verwijder_scenario(sid: str):
+    """Verwijdert het scenario en alle resultaten (runs) die ermee gemaakt zijn."""
     (SCENARIOS / f"{sid}.yaml").unlink(missing_ok=True)
-    return {"ok": True}
+    runs = [m["id"] for m in lijst_runs() if m["scenario_id"] == sid]
+    for rid in runs:
+        shutil.rmtree(RUNS / rid, ignore_errors=True)
+    return {"ok": True, "runs_verwijderd": len(runs)}
 
 
 # ------------------------------------------------------------------ runs
@@ -126,22 +139,36 @@ def _uitvoeren(rid, cfg):
     _schrijf_meta(rid, m)
 
 
-@app.post("/api/runs")
-def start_run(v: RunVerzoek):
-    sc = get_scenario(v.scenario_id)
+def maak_run(scenario_id):
+    """Legt een nieuwe run van een scenario aan (status 'bezig'); geeft run-id en configuratie terug."""
+    sc = get_scenario(scenario_id)
     cfg = schema.config_uit_waarden(BASIS, sc["waarden"])
     rid = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + sc["id"][:30]
     (RUNS / rid).mkdir(parents=True)
     _schrijf_meta(rid, {"id": rid, "scenario_id": sc["id"], "scenario_naam": sc["naam"], "omschrijving": sc.get("omschrijving", ""),
                         "waarden": sc["waarden"], "gestart": _nu(), "status": "bezig"})
+    return rid, cfg
+
+
+@app.post("/api/runs")
+def start_run(v: RunVerzoek):
+    rid, cfg = maak_run(v.scenario_id)
     threading.Thread(target=_uitvoeren, args=(rid, cfg), daemon=True).start()
     return _meta(rid)
 
 
 @app.get("/api/runs")
 def lijst_runs():
-    uit = [m for p in RUNS.iterdir() if p.is_dir() and (m := _meta(p.name))]
-    return sorted(uit, key=lambda m: m["gestart"], reverse=True)
+    """Runs, nieuwste eerst. `scenario_bestaat`: false voor resultaten van een verwijderd scenario;
+    `nieuwste`: true voor de laatste afgeronde run van elk scenario."""
+    uit = sorted([m for p in RUNS.iterdir() if p.is_dir() and (m := _meta(p.name))], key=lambda m: m["gestart"], reverse=True)
+    gezien = set()
+    for m in uit:
+        m["scenario_bestaat"] = (SCENARIOS / f"{m['scenario_id']}.yaml").exists()
+        m["nieuwste"] = m["status"] == "klaar" and m["scenario_id"] not in gezien
+        if m["nieuwste"]:
+            gezien.add(m["scenario_id"])
+    return uit
 
 
 @app.get("/api/runs/{rid}")
@@ -155,7 +182,24 @@ def get_run(rid: str):
         m["typedagen"] = json.loads((d / "typedagen.json").read_text())
         m["flex"] = json.loads((d / "flex.json").read_text())
         m["worstcase"] = json.loads((d / "worstcase.json").read_text())
+        m["max_vermogen"] = max_vermogen(yaml.safe_load((d / "config.yaml").read_text()))   # uit de opgeslagen config, ook voor oude runs
     return m
+
+
+@app.get("/api/rapport")
+def rapport(runs: str):
+    """A4-rapport (PDF) van 2 tot 4 runs, in de gekozen volgorde (run 1 = basis)."""
+    ids = [x for x in runs.split(",") if x]
+    if not 2 <= len(ids) <= 4:
+        raise HTTPException(400, "kies 2 tot 4 runs")
+    for rid in ids:
+        m = _meta(rid)
+        if not m or m["status"] != "klaar":
+            raise HTTPException(404, f"run {rid} niet gevonden of niet klaar")
+    from .rapport import maak_rapport   # pas laden bij gebruik (matplotlib/reportlab)
+    pdf = maak_rapport([RUNS / rid for rid in ids])
+    naam = f"vergelijking_simulaties_{datetime.now():%Y%m%d_%H%M}.pdf"
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{naam}"'})
 
 
 @app.get("/api/runs/{rid}/jaar")

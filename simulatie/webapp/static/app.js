@@ -3,6 +3,12 @@ const K = {  // grafiekkleuren: UU-secundair, alleen in grafieken
   ht: "#C00A35", lt: "#F3965E", buffer: "#24A793", soc: "#5287C6", totaal: "#001240", temp: "#5287C6",
   venster: "rgba(255,205,0,0.22)", runs: ["#001240", "#C00A35", "#24A793", "#F3965E"],
 };
+const TURBO = [[0, "#30123B"], [0.1, "#4662D7"], [0.2, "#36AAF9"], [0.3, "#1AE4B6"], [0.4, "#72FE5E"], [0.5, "#C7EF34"],
+  [0.6, "#FABA39"], [0.7, "#F66B19"], [0.8, "#CA2A04"], [0.9, "#8F0D02"], [1, "#7A0403"]];  // regenboogschaal (Turbo)
+const MAANDSTART = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335];
+// categorie-as van de flexibiliteitsenvelop: label bij 20, 60, … kWe en "uit"
+const flexAs = (lab) => ({ title: "gevraagde verlaging [kWe]", type: "category", tickangle: 0,
+  tickvals: lab.filter((x) => x === "uit" || Number(x) % 40 === 20) });
 const MND = ["jan", "feb", "mrt", "apr", "mei", "jun", "jul", "aug", "sep", "okt", "nov", "dec"];
 const S = { geavanceerd: false, schema: null, scenarios: [], runs: [], gekozenScenario: null, gekozenRun: null, vergelijk: [], dag: null };
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -18,8 +24,25 @@ async function api(pad, opties = {}) {
 const PL = { displaylogo: false, responsive: true, modeBarButtonsToRemove: ["lasso2d", "select2d"] };
 const layoutBasis = (extra = {}) => ({
   font: { family: "Open Sans, Arial", size: 12, color: "#1A1A1A" }, paper_bgcolor: "#fff", plot_bgcolor: "#fff",
-  margin: { l: 60, r: 20, t: 30, b: 40 }, hovermode: "x unified", legend: { orientation: "h", y: -0.12 }, ...extra,
+  margin: { l: 60, r: 20, t: 40, b: 50 }, hovermode: "x unified",
+  legend: { orientation: "h", x: 0, xanchor: "left", y: 1.02, yanchor: "bottom" }, ...extra,
 });
+
+// gestapelde panelen met vaste tussenruimte; titel net boven elk paneel
+function panelen(hoogtes, titels, gat = 0.075) {
+  const schaal = (1 - gat * (hoogtes.length - 1)) / hoogtes.reduce((a, b) => a + b, 0);
+  const uit = { assen: {}, annotations: [] };
+  let top = 1;
+  hoogtes.forEach((h, i) => {
+    const onder = top - h * schaal;
+    uit.assen[i === 0 ? "yaxis" : `yaxis${i + 1}`] = { domain: [Math.max(0, onder), top] };
+    uit.annotations.push({ text: titels[i], xref: "paper", yref: "paper", x: 0, y: top, yshift: 6, yanchor: "bottom", xanchor: "left", showarrow: false });
+    top = onder - gat;
+  });
+  return uit;
+}
+const TIJDAS = { type: "date", tickformat: "%H:%M<br>%d-%m", hoverformat: "%d-%m %H:%M", showgrid: true };
+const LEGENDA_ONDER = { orientation: "h", x: 0, xanchor: "left", y: -0.09, yanchor: "top" };
 
 /* ------------------------------------------------------------------ router */
 async function route() {
@@ -74,8 +97,10 @@ async function schermScenarios() {
   $("#opslaan").onclick = async () => { await bewaar(false); await schermScenarios(); $("#bewaard").textContent = "✓ opgeslagen"; };
   if ($("#kopie")) $("#kopie").onclick = async () => { $("#naam").value += " (kopie)"; await bewaar(true); schermScenarios(); };
   if ($("#weg")) $("#weg").onclick = async () => {
-    if (!confirm(`Scenario '${huidig.naam}' verwijderen?`)) return;
+    const n = (await api("/api/runs")).filter((r) => r.scenario_id === huidig.id).length;
+    if (!confirm(`Scenario '${huidig.naam}' verwijderen?${n ? `\n\nOok de ${n} resultaten van dit scenario worden verwijderd.` : ""}`)) return;
     await api(`/api/scenarios/${huidig.id}`, { method: "DELETE" });
+    S.vergelijk = []; S.gekozenRun = null;
     S.gekozenScenario = null; schermScenarios();
   };
   $("#naarSim").onclick = async () => { await bewaar(false); location.hash = "#/simulatie"; };
@@ -151,81 +176,167 @@ function bouwFormulier(doel, w) {
 /* ================================================================== 2 · SIMULATIE */
 async function schermSimulatie() {
   [S.scenarios, S.runs] = await Promise.all([api("/api/scenarios"), api("/api/runs")]);
-  const opties = S.scenarios.map((s) => `<option value="${s.id}" ${s.id === S.gekozenScenario ? "selected" : ""}>${esc(s.naam)}</option>`).join("");
+  S.runs = S.runs.filter((r) => r.scenario_bestaat);   // resultaten van verwijderde scenario's niet tonen
+  if (!S.scenarios.length) { app.innerHTML = '<h2>Simulatie</h2><div class="kaart leeg sectie">Maak eerst een scenario in stap 1.</div>'; return; }
+  // gekozen scenario (uit stap 1) heeft voorrang; het resultaat volgt het scenario
+  const gekozen = S.runs.find((r) => r.id === S.gekozenRun);
+  const laatste = S.runs.find((r) => r.status === "klaar" && S.scenarios.find((s) => s.id === r.scenario_id));
+  if (!S.scenarios.find((s) => s.id === S.gekozenScenario))   // niets gekozen: open op het scenario van de laatste run
+    S.gekozenScenario = (gekozen || laatste || { scenario_id: S.scenarios[0].id }).scenario_id;
+  if (!gekozen || gekozen.scenario_id !== S.gekozenScenario)
+    S.gekozenRun = (S.runs.find((r) => r.scenario_id === S.gekozenScenario && r.status === "klaar") || {}).id || null;
   app.innerHTML = `
     <h2>Simulatie</h2>
-    <p class="sub">Kies een scenario en draai de jaarsimulatie (8.760 uur). Daarna: KPI's, deep dive op standaarddagen en het jaaroverzicht.</p>
-    <div class="raster twee">
-      <div class="kaart geel">
-        <h3>Draai simulatie</h3>
-        ${S.scenarios.length ? `<select class="tekstveld" id="sc">${opties}</select>
-          <div style="margin-top:12px"><button class="knop primair groot" id="draai">▶ Draai simulatie</button></div>
-          <div id="status" style="margin-top:12px"></div>` : '<div class="leeg">Maak eerst een scenario in stap 1.</div>'}
-        <h3 style="margin-top:22px">Eerdere runs</h3>
-        <div class="lijst runlijst" id="runs"></div>
-      </div>
-      <div id="resultaat"><div class="kaart leeg">Kies een run of draai een nieuwe simulatie.</div></div>
-    </div>`;
-  tekenRunlijst();
-  if ($("#draai")) $("#draai").onclick = async () => {
-    const sid = $("#sc").value;
-    S.gekozenScenario = sid;
-    $("#draai").disabled = true;
-    $("#status").innerHTML = '<span class="spinner"></span> Rekenen…';
-    const m = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario_id: sid }) });
+    <div class="kaart geel simbalk">
+      <div><label for="sc">Scenario</label><select class="tekstveld" id="sc">${S.scenarios.map((s) =>
+        `<option value="${s.id}">${esc(s.naam)}</option>`).join("")}</select></div>
+      <button class="knop zwart" id="draai">▶ Draai simulatie</button>
+      <div><label for="run">Resultaat</label><select class="tekstveld" id="run"></select></div>
+      <button class="knop klein gevaar" id="weg" title="Gekozen resultaat verwijderen">Verwijder</button>
+    </div>
+    <div id="status" class="sectie" hidden></div>
+    <div id="resultaat" class="sectie"></div>`;
+  $("#sc").value = S.gekozenScenario;
+  vulRunkeuze();
+
+  $("#sc").onchange = () => {   // ander scenario: toon het laatste resultaat daarvan, als dat er is
+    S.gekozenScenario = $("#sc").value;
+    const laatste = S.runs.find((r) => r.scenario_id === S.gekozenScenario && r.status === "klaar");
+    S.gekozenRun = laatste ? laatste.id : null;
+    vulRunkeuze(); toonGekozen();
+  };
+  $("#run").onchange = () => {   // resultaat van een ander scenario: scenariokeuze volgt mee
+    S.gekozenRun = $("#run").value || null;
+    const r = S.runs.find((x) => x.id === S.gekozenRun);
+    if (r && S.scenarios.find((s) => s.id === r.scenario_id)) { S.gekozenScenario = r.scenario_id; $("#sc").value = r.scenario_id; }
+    vulRunkeuze(); toonGekozen();
+  };
+  $("#weg").onclick = async () => {
+    if (!S.gekozenRun || !confirm("Dit resultaat verwijderen?")) return;
+    await api(`/api/runs/${S.gekozenRun}`, { method: "DELETE" });
+    S.gekozenRun = null; schermSimulatie();
+  };
+  $("#draai").onclick = async () => {
+    const st = $("#status");
+    $("#draai").disabled = true; st.hidden = false;
+    st.innerHTML = '<div class="kaart"><span class="spinner"></span> Jaarsimulatie rekenen (8.760 uur)…</div>';
+    const m = await api("/api/runs", { method: "POST", body: JSON.stringify({ scenario_id: S.gekozenScenario }) });
     let r;
     do { await new Promise((ok) => setTimeout(ok, 700)); r = await api(`/api/runs/${m.id}`); } while (r.status === "bezig");
     $("#draai").disabled = false;
-    if (r.status === "fout") { $("#status").innerHTML = `<div class="melding fout">${esc(r.fout)}</div>`; return; }
-    $("#status").innerHTML = `✓ klaar in ${nl(r.duur_s, 1)} s`;
+    if (r.status === "fout") { st.innerHTML = `<div class="melding fout">${esc(r.fout)}</div>`; return; }
+    st.hidden = true;
     S.gekozenRun = r.id;
-    S.runs = await api("/api/runs");
-    tekenRunlijst();
-    toonRun(r);
+    S.runs = (await api("/api/runs")).filter((r) => r.scenario_bestaat);
+    vulRunkeuze(); toonRun(r);
   };
-  if (S.gekozenRun && S.runs.find((r) => r.id === S.gekozenRun && r.status === "klaar")) toonRun(await api(`/api/runs/${S.gekozenRun}`));
+  toonGekozen();
 }
 
-function tekenRunlijst() {
-  const doel = $("#runs");
-  if (!doel) return;
-  doel.innerHTML = S.runs.length ? "" : '<div class="leeg">Nog geen runs.</div>';
-  S.runs.forEach((r) => {
-    const el = document.createElement("div");
-    el.className = "item" + (r.id === S.gekozenRun ? " gekozen" : "");
-    el.innerHTML = `<div class="t">${esc(r.scenario_naam)}</div><div class="o">${esc(r.omschrijving || "")}</div>
-      <div class="rij tussen"><div class="d">${esc(r.gestart.replace("T", " "))} · ${r.status}</div><button class="knop klein gevaar" data-weg>Verwijder</button></div>`;
-    el.onclick = async (e) => {
-      if (e.target.hasAttribute("data-weg")) return;
-      if (r.status !== "klaar") return;
-      S.gekozenRun = r.id; tekenRunlijst(); toonRun(await api(`/api/runs/${r.id}`));
-    };
-    el.querySelector("[data-weg]").onclick = async () => {
-      if (!confirm("Run verwijderen?")) return;
-      await api(`/api/runs/${r.id}`, { method: "DELETE" });
-      if (S.gekozenRun === r.id) S.gekozenRun = null;
-      schermSimulatie();
-    };
-    doel.appendChild(el);
-  });
+// resultatenlijst: alleen afgeronde runs, nieuwste eerst
+function vulRunkeuze() {
+  const klaar = S.runs.filter((r) => r.status === "klaar");
+  if (S.gekozenRun && !klaar.find((r) => r.id === S.gekozenRun)) S.gekozenRun = null;
+  $("#run").innerHTML = (S.gekozenRun ? "" : '<option value="">— nog geen resultaat gekozen —</option>')
+    + klaar.map((r) => `<option value="${r.id}">${esc(r.scenario_naam)} · ${r.gestart.slice(8, 10)}-${r.gestart.slice(5, 7)} ${r.gestart.slice(11, 16)}${r.nieuwste ? "" : " · eerdere run"}</option>`).join("");
+  $("#run").value = S.gekozenRun || "";
+  $("#weg").disabled = !S.gekozenRun;
 }
 
-function kpiKaarten(k, wc) {
-  const e = k.elektra, b = k.buffer, bd = k.bedrijf, ko = k.kosten;
+async function toonGekozen() {
+  if (!S.gekozenRun) {
+    $("#resultaat").innerHTML = '<div class="kaart leeg">Nog geen resultaat voor dit scenario. Klik op <b>Draai simulatie</b>.</div>';
+    return;
+  }
+  toonRun(await api(`/api/runs/${S.gekozenRun}`));
+}
+
+function vensterTekst(w) {
+  const mnd = w["congestie.maanden"] || [], uren = w["congestie.uren_lokaal"] || [];
+  return `${w["congestie.alleen_werkdagen"] ? "werkdagen" : "alle dagen"} ${uren[0]}–${uren[1]} h, ${MND[mnd[0] - 1]}–${MND[mnd[mnd.length - 1] - 1]}`;
+}
+
+// ⓘ-knop met uitlegpopup; plaatsen als direct kind van een .kpi of .kaart
+const info = (titel, html) => `<button class="info" type="button" aria-label="Uitleg: ${esc(titel)}" aria-expanded="false">i</button><div class="uitleg" role="dialog" hidden>${html}</div>`;
+
+// uitleg bij de grafieken; w = scenariowaarden van de (eerste) run
+const UITLEG = {
+  dag: (w) => `<b>Wat:</b> het uurbeeld van de gekozen dag(en), van boven naar beneden:
+    het elektrisch vermogen van de HT- en LT-WP's; het laden (+) en ontladen (−) van het buffer; de buffervulling; en de warmtevraag per net met de buitentemperatuur.
+    <b>Geel:</b> het ontlaadvenster (${vensterTekst(w)}). Daarin levert het buffer de warmte en gaan de WP's omlaag of uit.
+    <b>Back-up-tabel:</b> per dag hoeveel uur het buffer alleen de vraag kan dekken als alle WP's aan het begin van het venster uitgaan.`,
+  heat: () => `<b>Wat:</b> elk vakje is één uur van het jaar. Horizontaal staat de dag, verticaal het uur van de dag (lokale tijd). De kleur is het elektrisch vermogen van de WP's samen.
+    <b>Zo lees je het:</b> rood is veel vermogen, blauw is weinig of uit. Een blauwe band overdag in de wintermaanden is het ontlaadvenster. Rode banden ervoor en erna laten zien waar het bijladen van het buffer naartoe verschuift.`,
+  maand: (w) => `<b>Wat:</b> per maand de hoogste uurwaarde van het elektrisch vermogen van de WP's samen.
+    <b>Grijs, maandpiek:</b> het hoogste uur van de hele maand, ook 's nachts en in het weekend. Hierop is het kW-max-tarief gebaseerd.
+    <b>Donker, piek in het ontlaadvenster:</b> het hoogste uur binnen het venster (${vensterTekst(w)}). Zoveel dragen de WP's op z'n hoogst nog bij aan de campuspiek tijdens congestie.
+    <b>Zo lees je het:</b> donker 0 betekent dat de WP's die maand in elk vensteruur uit stonden. Geen donkere balk betekent dat de maand buiten de congestieperiode valt. De grijze piek daalt meestal niet, want het bijladen buiten het venster vraagt ook vermogen: de piek verschuift en verdwijnt niet.`,
+  duur: () => `<b>Wat:</b> alle uurwaarden van het WP-vermogen, gesorteerd van hoog naar laag.
+    <b>Zo lees je het:</b> op x = 1.000 staat het vermogen dat 1.000 uur per jaar wordt gehaald of overschreden. Het oppervlak onder de lijn is het jaarverbruik.
+    <b>Donker:</b> alle 8.760 uren. <b>Rood:</b> alleen de vensteruren; hoe sneller die naar 0 zakt, hoe vaker de WP's in het venster uit staan.`,
+  flex: () => `<b>Vraag:</b> als we in elk vensteruur R kWe minder willen afnemen (x-as), hoe vaak lukt dat dan?
+    <b>Berekening:</b> uitgaande van een referentierun met dezelfde installatie levert het buffer het weggevallen vermogen, en de HT-WP's laden het buiten het venster weer bij. Het model rekent het hele jaar aan één stuk door: een buffer dat na een koude dag niet vol is, telt mee voor de volgende dag.
+    <b>Doorgetrokken lijn:</b> het aandeel vensteruren waarin de volledige verlaging wordt gehaald.
+    <b>Stippellijn:</b> het aandeel dagen waarop dat het hele venster lukt.
+    <b>"uit":</b> de WP's helemaal uit in het venster.`,
+  vdag: (w) => `<b>Wat:</b> dezelfde dag(en) voor alle gekozen runs, elk in een eigen kleur. Van boven naar beneden: het elektrisch vermogen van de WP's samen; het ontladen (+) en laden (−) van het buffer; de buffervulling.
+    <b>Geel:</b> het ontlaadvenster van de eerste run (${vensterTekst(w)}).`,
+  vmaand: (w) => `<b>Wat:</b> per maand het hoogste uur van het WP-vermogen binnen het ontlaadvenster (${vensterTekst(w)}), per run.
+    <b>Zo lees je het:</b> 0 betekent dat de WP's in elk vensteruur van die maand uit stonden. Geen balk betekent dat er die maand geen venster is.`,
+  vflex: () => `<b>Wat:</b> het aandeel vensteruren waarin een gevraagde verlaging van R kWe volledig lukt, per run.
+    De berekening is dezelfde als bij de flexibiliteitsgrafiek in het Simulatie-scherm: buffer levert, HT-WP's laden buiten het venster bij, en het jaar wordt aan één stuk doorgerekend.`,
+};
+
+function kpiKaarten(k, wc, w, mx) {
+  const e = k.elektra;
+  const venster = vensterTekst(w);
   const items = [
-    [nl(e.totaal_mwhe) + " MWhe", "elektriciteit warmtepompen / jaar"],
-    [nl(e.spf_wp, 2), "SPF warmtepompen"],
-    [nl(e.piek_kwe) + " kWe", "piek elektrisch vermogen"],
-    [nl(e.gem_kwe_congestievenster, 1) + " kWe", "gem. vermogen in ontlaadvenster"],
-    [nl(e.som_maandpieken_venster_kwe) + " kWe", "Σ maandpieken in venster"],
-    [nl(b.geladen_mwh) + " / " + nl(b.naar_ht_mwh + b.naar_lt_mwh) + " MWh", "buffer geladen / ontladen"],
-    [nl(bd.ht_pendeluren) + " / " + nl(bd.lt_pendeluren) + " h", "pendeluren HT / LT"],
-    [nl(wc[">= 24 h"]) + " %", "back-up ≥ 24 h (alleen buffer)"],
-    ["€ " + nl(ko.inkoop_vast_eur), "energiekosten WP's (UU-contract, incl. EB)"],
-    [nl(k.warmte.tekort_mwh, 1) + " MWh", "warmtetekort"],
+    [nl(e.totaal_mwhe) + " MWhe", "elektriciteit warmtepompen / jaar",
+      `<b>Wat:</b> het totale elektriciteitsverbruik van de drie warmtepompen (2 × HT, 1 × LT) over het simulatiejaar (8.760 uur).
+       <b>Telt mee:</b> directe warmtelevering aan het HT- en LT-net én het laden van het buffer.
+       <b>Telt niet mee:</b> circulatiepompen, regeling en de ZLT-koelmachine.
+       <div class="formule">Σ<sub>uren</sub> (P<sub>el,HT</sub> + P<sub>el,LT</sub>) × 1 h ÷ 1.000</div>`],
+    [nl(e.spf_wp, 2), "SPF warmtepompen",
+      `<b>Wat:</b> de seizoensprestatiefactor, dus de jaargemiddelde COP van de warmtepompen samen.
+       <b>Telt mee:</b> alle warmte die de WP's leveren, zowel direct aan de netten als voor het laden van het buffer.
+       <b>Telt niet mee:</b> de condensorwarmte van de ZLT-koelmachine. Bufferverliezen drukken de SPF dus niet, maar kosten wel extra laadwerk.
+       <div class="formule">SPF = Σ Q<sub>WP</sub> ÷ Σ E<sub>el,WP</sub></div>Hoger = efficiënter.`],
+    [nl(e.piek_kwe) + " kWe", `piek elektrisch vermogen${mx ? ` (max. ${nl(mx.totaal_kwe)} kWe)` : ""}`,
+      `<b>Wat:</b> het hoogste elektrische vermogen van de warmtepompen samen in het hele jaar, binnen én buiten het ontlaadvenster.
+       ${mx ? `<b>Max. tussen haakjes:</b> wat de WP's samen maximaal kunnen vragen: alle WP's op hun maximale thermische vermogen bij de slechtste COP.
+       <div class="formule">HT ${nl(w["warmtepompen.ht.aantal"])} × ${nl(w["warmtepompen.ht.p_max_kw"])} kW bij ${nl(mx.ht.t_c)} °C, COP ${nl(mx.ht.cop, 2)} → ${nl(mx.ht.kwe)} kWe<br>
+       LT ${nl(w["warmtepompen.lt.aantal"])} × ${nl(w["warmtepompen.lt.p_max_kw"])} kW bij ${nl(mx.lt.t_c)} °C, COP ${nl(mx.lt.cop, 2)} → ${nl(mx.lt.kwe)} kWe</div>
+       Dit volgt uit het COP-model (aanname). Het echte aansluitvermogen staat op de typeplaat van de WP's en kan hoger liggen, bijvoorbeeld door hulpaandrijvingen en aanloopstroom.` : ""}
+       <b>Let op:</b> het model rekent per uur, dus dit is een uurgemiddelde. Kwartierpieken kunnen hoger liggen, bijvoorbeeld bij het opstarten.
+       <div class="formule">max<sub>uren</sub> (P<sub>el,HT</sub> + P<sub>el,LT</sub>)</div>`],
+    [nl(e.gem_kwe_congestievenster, 1) + " kWe", "gem. vermogen in ontlaadvenster",
+      `<b>Wat:</b> het gemiddelde elektrische vermogen van de warmtepompen samen over alle uren van het ontlaadvenster (hier: ${venster}).
+       <b>Zo lees je het:</b> 0 kWe betekent dat de WP's in het venster altijd uit staan en het buffer alle warmte levert. Vergelijk met de referentie om de gemiddelde verlaging te zien.
+       <div class="formule">gem<sub>vensteruren</sub> (P<sub>el,HT</sub> + P<sub>el,LT</sub>)</div>`],
+    [nl(wc[">= 24 h"]) + " %", "back-up ≥ 24 h (alleen buffer)",
+      `<b>Wat:</b> een worst-case-test, los van de gekozen strategie. Alle warmtepompen vallen uit en het buffer (${nl(w["buffer.volume_m3"])} m³) is vol.
+       <b>Berekening:</b> voor elk van de 8.760 mogelijke starturen bepaalt het model hoeveel uur het buffer, samen met de condensorwarmte naar LT, de volledige HT- en LT-vraag nog kan leveren. Het getal is het aandeel starturen waarop dat minstens 24 uur lukt.
+       <b>Stopt zodra:</b> het buffer leeg is, het ontlaadvermogen tekortschiet, of de buffertemperatuur onder de gevraagde aanvoertemperatuur zakt.
+       <div class="formule">kortst ${nl(wc.kortst_h)} h · mediaan ${nl(wc.mediaan_h)} h</div>
+       <b>Let op:</b> dit is een jaarcijfer met steeds een vol buffer. Per dag, ook vanaf de werkelijke vulling in de simulatie, zie je het in de deep dive.`],
   ];
-  return `<div class="kpis">${items.map(([w, l]) => `<div class="kpi"><div class="w">${w}</div><div class="l">${l}</div></div>`).join("")}</div>`;
+  return `<div class="kpis">${items.map(([v, l, uitleg]) => `<div class="kpi">${info(l, uitleg)}<div class="w">${v}</div><div class="l">${l}</div></div>`).join("")}</div>`;
 }
+
+// één uitleg-popup tegelijk; sluit bij klik buiten de popup of met Escape
+function sluitUitleg(behalve) {
+  document.querySelectorAll(".uitleg").forEach((u) => { if (u !== behalve) { u.hidden = true; u.parentElement.querySelector(".info").setAttribute("aria-expanded", "false"); } });
+}
+document.addEventListener("click", (e) => {
+  const knop = e.target.closest(".info");
+  if (!knop) { if (!e.target.closest(".uitleg")) sluitUitleg(); return; }
+  const u = knop.parentElement.querySelector(".uitleg");
+  sluitUitleg(u);
+  u.hidden = !u.hidden; knop.setAttribute("aria-expanded", String(!u.hidden));
+  const tegel = knop.parentElement.getBoundingClientRect();   // klap open naar de kant waar ruimte is
+  u.classList.toggle("links", tegel.right - u.offsetWidth < 8);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") sluitUitleg(); });
 
 async function toonRun(r) {
   const doel = $("#resultaat");
@@ -234,40 +345,62 @@ async function toonRun(r) {
     ? `Netcongestie · ${w["strategie.congestie.alles_uit"] ? "WP's uit" : nl(w["strategie.congestie.reductie_kwe"]) + " kWe verlaging"}${w["strategie.congestie.adaptief"] ? " (adaptief)" : ""}`
     : "Referentie";
   doel.innerHTML = `
-    <div class="kaart geel">
+    <div class="kaart">
       <div class="rij tussen"><div><h3 style="margin:0">${esc(r.scenario_naam)}</h3>
         <div class="eenheid">${strategie} · buffer ${nl(w["buffer.volume_m3"])} m³ tot ${nl(w["buffer.t_laad_c"])} °C · venster ${w["congestie.uren_lokaal"][0]}–${w["congestie.uren_lokaal"][1]} h</div></div>
         <div class="eenheid">run ${esc(r.id)} · ${nl(r.duur_s, 1)} s</div></div>
     </div>
-    <div class="sectie">${kpiKaarten(r.kpi, r.kpi.worstcase_met_condensor)}</div>
+    <div class="sectie">${kpiKaarten(r.kpi, r.kpi.worstcase_met_condensor, r.waarden, r.max_vermogen)}</div>
     <div class="kaart sectie">
-      <h3>Deep dive · standaarddagen</h3>
-      <div class="dagkeuze" id="dagen"></div>
-      <div class="rij" style="margin-bottom:8px"><span class="eenheid">Of kies zelf:</span>
+      <h3>Deep dive · standaarddagen</h3>${info("Deep dive", UITLEG.dag(r.waarden))}
+      <div class="rij" style="margin-bottom:8px">
+        <select id="dagen" class="tekstveld" style="width:auto;min-width:260px"></select>
         <input type="date" id="eigen" class="tekstveld" style="width:170px" min="2001-01-01" max="2001-12-31">
-        <select id="aantal" class="tekstveld" style="width:110px"><option value="1">1 dag</option><option value="3">3 dagen</option><option value="7">7 dagen</option></select></div>
+        <select id="aantal" class="tekstveld" style="width:110px"><option value="1">1 dag</option><option value="3">3 dagen</option><option value="4">4 dagen</option><option value="7">7 dagen</option></select></div>
+      <div id="dagtoel" class="eenheid" style="margin-bottom:8px"></div>
+      <div id="backup"></div>
       <div id="dagplot" class="grafiek"></div>
     </div>
     <div class="raster sectie" style="grid-template-columns:1fr 1fr">
-      <div class="kaart"><h3>Elektrisch vermogen · dag × uur</h3><div id="heat" class="grafiek"></div></div>
-      <div class="kaart"><h3>Maandpiek warmtepompen</h3><div id="maand" class="grafiek"></div></div>
-      <div class="kaart"><h3>Duurkromme elektrisch vermogen</h3><div id="duur" class="grafiek"></div></div>
-      <div class="kaart"><h3>Flexibiliteit: hoeveel kWe, hoe lang?</h3><div id="flex" class="grafiek"></div>
+      <div class="kaart"><h3>Elektrisch vermogen · dag × uur</h3>${info("Heatmap", UITLEG.heat())}<div id="heat" class="grafiek"></div></div>
+      <div class="kaart"><h3>Maandpiek warmtepompen</h3>${info("Maandpiek", UITLEG.maand(r.waarden))}<div id="maand" class="grafiek"></div></div>
+      <div class="kaart"><h3>Duurkromme elektrisch vermogen</h3>${info("Duurkromme", UITLEG.duur())}<div id="duur" class="grafiek"></div></div>
+      <div class="kaart"><h3>Flexibiliteit: hoeveel kWe, hoe lang?</h3>${info("Flexibiliteit", UITLEG.flex())}<div id="flex" class="grafiek"></div>
         <div class="eenheid">Referentie-basislijn met dezelfde systeeminstellingen; buffer levert in het venster, HT-WP's laden daarbuiten bij.</div></div>
     </div>`;
   const dagen = $("#dagen");
-  r.typedagen.forEach((d, i) => {
-    const c = document.createElement("div");
-    c.className = "chip" + (i === 0 ? " aan" : "");
-    c.innerHTML = `${esc(d.label)}<small>${d.datum.slice(5).split("-").reverse().join("-")} · ${esc(d.toelichting)}</small>`;
-    c.onclick = () => { dagen.querySelectorAll(".chip").forEach((x) => x.classList.remove("aan")); c.classList.add("aan"); S.dag = d.datum; tekenDag(r.id); };
-    dagen.appendChild(c);
-  });
-  S.dag = r.typedagen[0].datum;
-  $("#eigen").onchange = (e) => { dagen.querySelectorAll(".chip").forEach((x) => x.classList.remove("aan")); S.dag = e.target.value; tekenDag(r.id); };
+  dagOpties(dagen, r.typedagen, true);
+  const kies = () => {
+    const d = r.typedagen[dagen.value];
+    if (!d) return;
+    S.dag = d.datum; $("#eigen").value = d.datum; $("#aantal").value = d.dagen || 1;
+    $("#dagtoel").textContent = d.toelichting;
+    tekenDag(r.id);
+  };
+  dagen.onchange = kies;
+  $("#eigen").onchange = (e) => { dagen.value = "eigen"; $("#dagtoel").textContent = ""; S.dag = e.target.value; tekenDag(r.id); };
   $("#aantal").onchange = () => tekenDag(r.id);
-  tekenDag(r.id);
+  kies();
   tekenJaar(r);
+}
+
+function dagOpties(sel, typedagen, eigen) {
+  sel.innerHTML = typedagen.map((d, i) => `<option value="${i}">${esc(d.label)} · ${d.datum.slice(5).split("-").reverse().join("-")}</option>`).join("")
+    + (eigen ? `<option value="eigen" disabled>Eigen datum</option>` : "");
+}
+
+// back-up per getoonde dag: alle WP's uit vanaf het begin van het venster
+function tekenBackup(rijen) {
+  const doel = $("#backup");
+  if (!rijen || !rijen.length) { doel.innerHTML = ""; return; }
+  const dag = (iso) => new Date(iso).toLocaleDateString("nl-NL", { weekday: "short", day: "2-digit", month: "2-digit" });
+  const uur = (h, max) => h >= max ? `&gt; ${max} h` : `${h} h`;
+  doel.innerHTML = `<div class="backup"><div class="rij tussen"><h4>Back-up alleen buffer · start ${rijen[0].start}, alle WP's uit</h4>
+      <span class="eenheid">hoeveel uur dekt het buffer (met condensorwarmte) nog de volledige vraag?</span></div>
+    <table class="tab"><thead><tr><th>Dag</th><th>Vulling om ${rijen[0].start}</th><th>Vanaf vol buffer</th><th>Vanaf werkelijke vulling</th></tr></thead>
+    <tbody>${rijen.map((r) => `<tr><td>${dag(r.datum)}</td><td>${r.soc_pct ?? "–"} %</td><td>${uur(r.vol_h, r.max_h)}</td>
+      <td class="${r.nu_h < 24 ? "krap" : ""}"><b>${uur(r.nu_h, r.max_h)}</b></td></tr>`).join("")}</tbody></table>
+    <div class="eenheid">"Vanaf vol" is het theoretische maximum op deze dag; "werkelijk" gaat uit van de vulling die het buffer in deze simulatie op dat moment heeft. Rood = minder dan 24 h.</div></div>`;
 }
 
 function vensterVormen(t, vens) {
@@ -287,6 +420,7 @@ function vensterVormen(t, vens) {
 
 async function tekenDag(rid) {
   const d = await api(`/api/runs/${rid}/dag?datum=${S.dag}&dagen=${$("#aantal").value}`);
+  tekenBackup(d.backup);
   const t = d.t_lokaal, vens = d.congestievenster.map((v) => v === true || v === "True");
   const ontl = d.buf_ht.map((v, i) => -(v + d.buf_lt[i]));
   const sporen = [
@@ -299,30 +433,27 @@ async function tekenDag(rid) {
     { x: t, y: d.q_lt, name: "vraag LT [kW]", line: { color: K.lt, shape: "hv" }, xaxis: "x", yaxis: "y4" },
     { x: t, y: d.t_buiten, name: "T buiten [°C]", line: { color: K.temp, dash: "dot" }, xaxis: "x", yaxis: "y5" },
   ];
+  const p = panelen([0.27, 0.2, 0.15, 0.27], ["<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer laden (+) / ontladen (−)</b> [kW]",
+    "<b>Buffervulling</b> [%]", "<b>Warmtevraag</b> [kW] <b>en buitentemperatuur</b> [°C] · geel = ontlaadvenster"]);
   const ly = layoutBasis({
-    height: 760, barmode: "relative", bargap: 0.05, shapes: vensterVormen(t, vens),
-    grid: { rows: 4, columns: 1, pattern: "coupled", roworder: "top to bottom" },
-    yaxis: { title: "kWe", domain: [0.77, 1] }, yaxis2: { title: "kW", domain: [0.52, 0.73] },
-    yaxis3: { title: "%", domain: [0.29, 0.48], range: [0, 105] }, yaxis4: { title: "kW", domain: [0, 0.25] },
-    yaxis5: { title: "°C", overlaying: "y4", side: "right", showgrid: false },
-    xaxis: { anchor: "y4", type: "date" }, legend: { orientation: "h", y: -0.07 },
-    annotations: [
-      { text: "<b>Elektrisch vermogen warmtepompen</b>", xref: "paper", yref: "paper", x: 0, y: 1.02, showarrow: false, xanchor: "left" },
-      { text: "<b>Buffer laden (+) / ontladen (−)</b>", xref: "paper", yref: "paper", x: 0, y: 0.75, showarrow: false, xanchor: "left" },
-      { text: "<b>Buffervulling</b>", xref: "paper", yref: "paper", x: 0, y: 0.50, showarrow: false, xanchor: "left" },
-      { text: "<b>Warmtevraag en buitentemperatuur</b> · geel = ontlaadvenster", xref: "paper", yref: "paper", x: 0, y: 0.27, showarrow: false, xanchor: "left" },
-    ],
+    height: 860, barmode: "relative", bargap: 0.05, shapes: vensterVormen(t, vens), margin: { l: 60, r: 55, t: 30, b: 110 },
+    yaxis: { ...p.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...p.assen.yaxis2, zeroline: true, zerolinecolor: "#9A9A9A" },
+    yaxis3: { ...p.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, yaxis4: { ...p.assen.yaxis4, rangemode: "tozero" },
+    yaxis5: { overlaying: "y4", side: "right", showgrid: false, zeroline: false, ticksuffix: " °C" },
+    xaxis: { ...TIJDAS, anchor: "y4" }, legend: LEGENDA_ONDER, annotations: p.annotations,
   });
   Plotly.react("dagplot", sporen, ly, PL);
 }
 
 async function tekenJaar(r) {
   const j = await api(`/api/runs/${r.id}/jaar`);
-  Plotly.react("heat", [{ type: "heatmap", x: j.heatmap.dagen, y: j.heatmap.uren, z: j.heatmap.z, colorscale: "Turbo", colorbar: { title: "kWe" } }],
-    layoutBasis({ height: 330, xaxis: { title: "dag van het jaar" }, yaxis: { title: "uur" }, hovermode: "closest" }), PL);
+  Plotly.react("heat", [{ type: "heatmap", x: j.heatmap.dagen, y: j.heatmap.uren, z: j.heatmap.z, colorscale: TURBO, colorbar: { title: { text: "kWe" }, thickness: 12 } }],
+    layoutBasis({ height: 330, margin: { l: 60, r: 10, t: 20, b: 40 }, xaxis: { tickvals: MAANDSTART.filter((_, i) => i % 2 === 0), ticktext: MND.filter((_, i) => i % 2 === 0), tickangle: 0 },
+      yaxis: { title: "uur", tickvals: [0, 6, 12, 18, 23] }, hovermode: "closest" }), PL);
   Plotly.react("maand", [
     { type: "bar", x: j.maand.maand.map((m) => MND[m - 1]), y: j.maand.piek, name: "maandpiek", marker: { color: "#9A9A9A" } },
-    { type: "bar", x: j.maand.maand.map((m) => MND[m - 1]), y: j.maand.piek_venster, name: "piek in ontlaadvenster", marker: { color: K.totaal } },
+    { type: "bar", x: j.maand.maand.map((m) => MND[m - 1]), y: j.maand.piek_venster, name: "piek in ontlaadvenster", marker: { color: K.totaal },
+      text: j.maand.piek_venster.map((v) => v === null ? "" : nl(v)), textposition: "outside", cliponaxis: false, textfont: { size: 10 } },
   ], layoutBasis({ height: 330, barmode: "group", yaxis: { title: "kWe" } }), PL);
   Plotly.react("duur", [
     { y: j.duur, name: "hele jaar", line: { color: K.totaal, width: 2 } },
@@ -332,36 +463,91 @@ async function tekenJaar(r) {
   Plotly.react("flex", [
     { x: lab, y: r.flex.map((x) => x.uren_volledig_pct), name: "% vensteruren volledig verlaagd", line: { color: K.totaal, width: 3 } },
     { x: lab, y: r.flex.map((x) => x.dagen_heel_venster_pct), name: "% dagen hele venster", line: { color: K.ht, width: 3, dash: "dot" } },
-  ], layoutBasis({ height: 330, xaxis: { title: "gevraagde verlaging [kWe]", type: "category" }, yaxis: { title: "%", range: [0, 102] } }), PL);
+  ], layoutBasis({ height: 330, xaxis: flexAs(lab), yaxis: { title: "%", range: [0, 102] } }), PL);
 }
 
 /* ================================================================== 3 · VERGELIJKEN */
 async function schermVergelijken() {
-  S.runs = (await api("/api/runs")).filter((r) => r.status === "klaar");
+  S.runs = (await api("/api/runs")).filter((r) => r.status === "klaar" && r.scenario_bestaat);   // resultaten van verwijderde scenario's niet tonen
   S.vergelijk = S.vergelijk.filter((id) => S.runs.find((r) => r.id === id));
   app.innerHTML = `
     <h2>Vergelijken</h2>
-    <p class="sub">Kies 2 tot 4 runs. Verschillen worden getoond ten opzichte van de eerste gekozen run.</p>
-    <div class="raster twee">
-      <div class="kaart geel"><h3>Runs</h3><div class="lijst runlijst" id="kies" style="max-height:520px"></div></div>
-      <div id="vgl"><div class="kaart leeg">Kies minstens twee runs.</div></div>
-    </div>`;
-  const kies = $("#kies");
-  if (!S.runs.length) kies.innerHTML = '<div class="leeg">Nog geen afgeronde runs.</div>';
-  S.runs.forEach((r) => {
-    const el = document.createElement("div");
-    const pos = S.vergelijk.indexOf(r.id);
-    el.className = "item" + (pos >= 0 ? " gekozen" : "");
-    el.innerHTML = `<div class="rij tussen"><div class="t">${esc(r.scenario_naam)}</div>${pos >= 0 ? `<span class="chip aan" style="background:${K.runs[pos]};border-color:${K.runs[pos]};color:#fff">${pos + 1}</span>` : ""}</div>
-      <div class="o">${esc(r.omschrijving || "")}</div><div class="d">${esc(r.gestart.replace("T", " "))}</div>`;
-    el.onclick = () => {
-      const i = S.vergelijk.indexOf(r.id);
-      if (i >= 0) S.vergelijk.splice(i, 1); else if (S.vergelijk.length < 4) S.vergelijk.push(r.id);
-      schermVergelijken();
-    };
-    kies.appendChild(el);
-  });
-  if (S.vergelijk.length >= 2) toonVergelijking();
+    <div class="kaart geel vglbalk">
+      <label>Runs vergelijken <span class="eenheid">· 2 tot 4; de eerste gekozen run is de basis</span></label>
+      <div class="vglrij">
+        <div class="multikeuze" id="mk">
+          <div class="mk-knop" id="mk-knop" role="button" tabindex="0" aria-haspopup="listbox" aria-expanded="false"></div>
+          <div class="mk-paneel" id="mk-paneel" role="listbox" aria-multiselectable="true" hidden></div>
+        </div>
+        <button class="knop zwart" id="pdf" type="button" disabled title="A4-rapport van de gekozen runs">⬇ Rapport (PDF)</button>
+      </div>
+    </div>
+    <div id="vgl" class="sectie"></div>`;
+  const knop = $("#mk-knop"), paneel = $("#mk-paneel");
+  const datum = (r) => `${r.gestart.slice(8, 10)}-${r.gestart.slice(5, 7)} ${r.gestart.slice(11, 16)}`;
+  const open = (ja) => { paneel.hidden = !ja; knop.setAttribute("aria-expanded", String(ja)); };
+
+  const tekenKeuze = () => {
+    knop.innerHTML = (S.vergelijk.length
+      ? S.vergelijk.map((id, i) => { const r = S.runs.find((x) => x.id === id);
+          return `<span class="mk-chip" style="background:${K.runs[i]}"><b>${i + 1}</b> ${esc(r.scenario_naam)} <small>${datum(r)}</small><button type="button" data-weg="${id}" aria-label="Verwijder ${esc(r.scenario_naam)}">×</button></span>`; }).join("")
+      : '<span class="eenheid">Kies runs…</span>') + '<span class="mk-pijl">▾</span>';
+    // opties alleen bijwerken (niet opnieuw opbouwen), zodat de scrollpositie in de lijst blijft staan
+    paneel.querySelectorAll(".mk-optie").forEach((o) => {
+      const inp = o.querySelector("input"), pos = S.vergelijk.indexOf(inp.value), vol = S.vergelijk.length >= 4 && pos < 0;
+      inp.checked = pos >= 0; inp.disabled = vol; o.classList.toggle("uit", vol);
+      const nr = o.querySelector(".mk-nr");
+      nr.textContent = pos >= 0 ? pos + 1 : ""; nr.style.background = pos >= 0 ? K.runs[pos] : "";
+    });
+  };
+  paneel.innerHTML = S.runs.length ? S.runs.map((r) => `<label class="mk-optie"><input type="checkbox" value="${r.id}"><span class="mk-nr"></span>
+      <span><span class="t">${esc(r.scenario_naam)}</span> <span class="d">${datum(r)}${r.nieuwste ? "" : " · eerdere run"}</span><br><span class="o">${esc(r.omschrijving || "")}</span></span></label>`).join("")
+    : '<div class="leeg">Nog geen afgeronde runs.</div>';
+  const wijzig = () => {
+    tekenKeuze();
+    $("#pdf").disabled = S.vergelijk.length < 2;
+    if (S.vergelijk.length >= 2) toonVergelijking();
+    else $("#vgl").innerHTML = '<div class="kaart leeg">Kies minstens twee runs in de balk hierboven.</div>';
+  };
+
+  // rapport: server maakt de PDF van de gekozen runs (in volgorde), browser slaat hem op
+  $("#pdf").onclick = async () => {
+    const k = $("#pdf"), tekst = k.textContent;
+    k.disabled = true; k.innerHTML = '<span class="spinner"></span> Rapport maken…';
+    try {
+      const r = await fetch(`/api/rapport?runs=${encodeURIComponent(S.vergelijk.join(","))}`);
+      if (!r.ok) throw new Error(await r.text());
+      const naam = (r.headers.get("Content-Disposition") || "").match(/filename="(.+)"/)?.[1] || "vergelijking.pdf";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(await r.blob()); a.download = naam;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    } catch (e) {
+      alert(`Rapport maken mislukt: ${e.message}`);
+    } finally {
+      k.textContent = tekst; k.disabled = S.vergelijk.length < 2;
+    }
+  };
+
+  knop.onclick = (e) => {
+    const weg = e.target.closest("[data-weg]");
+    if (weg) { S.vergelijk = S.vergelijk.filter((id) => id !== weg.dataset.weg); wijzig(); return; }
+    open(paneel.hidden);
+  };
+  knop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(paneel.hidden); } };
+  paneel.onchange = (e) => {
+    const id = e.target.value;
+    if (e.target.checked) { if (S.vergelijk.length < 4) S.vergelijk.push(id); } else S.vergelijk = S.vergelijk.filter((x) => x !== id);
+    wijzig();
+  };
+  // sluiten bij klik buiten de keuzelijst of Escape (één keer registreren, werkt op de actuele lijst)
+  if (!S.mkLuisteraars) {
+    const sluit = () => { const p = $("#mk-paneel"); if (p) { p.hidden = true; $("#mk-knop").setAttribute("aria-expanded", "false"); } };
+    document.addEventListener("click", (e) => { if (!e.target.closest("#mk")) sluit(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") sluit(); });
+    S.mkLuisteraars = true;
+  }
+  wijzig();
 }
 
 const KPI_RIJEN = [
@@ -400,30 +586,26 @@ async function toonVergelijking() {
   $("#vgl").innerHTML = `
     <div class="kaart"><h3>KPI's</h3><table class="tab"><thead><tr><th></th>${kop}</tr></thead><tbody>${rijen}</tbody></table>
       <div class="eenheid" style="margin-top:6px">Groen = beter, rood = slechter dan run 1.</div></div>
-    <div class="kaart sectie"><h3>Standaarddag naast elkaar</h3><div class="dagkeuze" id="vdagen"></div><div id="vdag" class="grafiek"></div></div>
+    <div class="kaart sectie"><h3>Standaarddag naast elkaar</h3>${info("Standaarddag", UITLEG.vdag(runs[0].waarden))}<div class="rij" style="margin-bottom:8px"><select id="vdagen" class="tekstveld" style="width:auto;min-width:260px"></select><span id="vdagtoel" class="eenheid"></span></div><div id="vdag" class="grafiek"></div></div>
     <div class="raster sectie" style="grid-template-columns:1fr 1fr">
-      <div class="kaart"><h3>Maandpiek WP's in ontlaadvenster</h3><div id="vmaand" class="grafiek"></div></div>
-      <div class="kaart"><h3>Flexibiliteitsenvelop</h3><div id="vflex" class="grafiek"></div></div>
+      <div class="kaart"><h3>Maandpiek WP's in ontlaadvenster</h3>${info("Maandpiek", UITLEG.vmaand(runs[0].waarden))}<div id="vmaand" class="grafiek"></div></div>
+      <div class="kaart"><h3>Flexibiliteitsenvelop</h3>${info("Flexibiliteitsenvelop", UITLEG.vflex())}<div id="vflex" class="grafiek"></div></div>
     </div>`;
   const vd = $("#vdagen");
-  runs[0].typedagen.forEach((d, i) => {
-    const c = document.createElement("div");
-    c.className = "chip" + (i === 0 ? " aan" : "");
-    c.innerHTML = `${esc(d.label)}<small>${d.datum.slice(5).split("-").reverse().join("-")}</small>`;
-    c.onclick = () => { vd.querySelectorAll(".chip").forEach((x) => x.classList.remove("aan")); c.classList.add("aan"); tekenVergelijkDag(runs, d.datum); };
-    vd.appendChild(c);
-  });
-  tekenVergelijkDag(runs, runs[0].typedagen[0].datum);
+  dagOpties(vd, runs[0].typedagen, false);
+  vd.onchange = () => { const d = runs[0].typedagen[vd.value]; $("#vdagtoel").textContent = d.toelichting; tekenVergelijkDag(runs, d.datum, d.dagen); };
+  vd.onchange();
 
   const jaren = await Promise.all(runs.map((r) => api(`/api/runs/${r.id}/jaar`)));
-  Plotly.react("vmaand", jaren.map((j, i) => ({ type: "bar", x: j.maand.maand.map((m) => MND[m - 1]), y: j.maand.piek_venster, name: runs[i].scenario_naam, marker: { color: K.runs[i] } })),
+  Plotly.react("vmaand", jaren.map((j, i) => ({ type: "bar", x: j.maand.maand.map((m) => MND[m - 1]), y: j.maand.piek_venster, name: runs[i].scenario_naam, marker: { color: K.runs[i] },
+    text: j.maand.piek_venster.map((v) => v === null ? "" : nl(v)), textposition: "outside", cliponaxis: false, textfont: { size: 10 } })),
     layoutBasis({ height: 340, barmode: "group", yaxis: { title: "kWe" } }), PL);
   Plotly.react("vflex", runs.map((r, i) => ({ x: r.flex.map((x) => x.reductie_kwe === "alles" ? "uit" : String(x.reductie_kwe)), y: r.flex.map((x) => x.uren_volledig_pct), name: r.scenario_naam, line: { color: K.runs[i], width: 3 } })),
-    layoutBasis({ height: 340, xaxis: { title: "gevraagde verlaging [kWe]", type: "category" }, yaxis: { title: "% vensteruren volledig", range: [0, 102] } }), PL);
+    layoutBasis({ height: 340, xaxis: flexAs(runs[0].flex.map((x) => x.reductie_kwe === "alles" ? "uit" : String(x.reductie_kwe))), yaxis: { title: "% vensteruren volledig", range: [0, 102] } }), PL);
 }
 
-async function tekenVergelijkDag(runs, datum) {
-  const data = await Promise.all(runs.map((r) => api(`/api/runs/${r.id}/dag?datum=${datum}&dagen=1`)));
+async function tekenVergelijkDag(runs, datum, dagen = 1) {
+  const data = await Promise.all(runs.map((r) => api(`/api/runs/${r.id}/dag?datum=${datum}&dagen=${dagen}`)));
   const t = data[0].t_lokaal;
   const vens = data[0].congestievenster.map((v) => v === true || v === "True");
   const sporen = [];
@@ -433,14 +615,12 @@ async function tekenVergelijkDag(runs, datum) {
     sporen.push({ x: d.t_lokaal, y: d.buf_ht.map((v, j) => v + d.buf_lt[j] - d.laad[j]), name: naam + " · buffer", legendgroup: naam, showlegend: false, line: { color: kleur, width: 2, shape: "hv" }, yaxis: "y2" });
     sporen.push({ x: d.t_lokaal, y: d.soc.map((v) => v * 100), name: naam + " · vulling", legendgroup: naam, showlegend: false, line: { color: kleur, width: 2, dash: "dot" }, yaxis: "y3" });
   });
+  const vp = panelen([0.36, 0.3, 0.24], ["<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer ontladen (+) / laden (−)</b> [kW]",
+    "<b>Buffervulling</b> [%] · lijn = run, geel = ontlaadvenster"]);
   Plotly.react("vdag", sporen, layoutBasis({
-    height: 620, shapes: vensterVormen(t, vens), xaxis: { anchor: "y3", type: "date" },
-    yaxis: { title: "kWe", domain: [0.68, 1] }, yaxis2: { title: "kW", domain: [0.36, 0.62] }, yaxis3: { title: "%", domain: [0, 0.3], range: [0, 105] },
-    annotations: [
-      { text: "<b>Elektrisch vermogen warmtepompen</b>", xref: "paper", yref: "paper", x: 0, y: 1.03, showarrow: false, xanchor: "left" },
-      { text: "<b>Buffer: ontladen (+) / laden (−)</b>", xref: "paper", yref: "paper", x: 0, y: 0.64, showarrow: false, xanchor: "left" },
-      { text: "<b>Buffervulling</b> · geel = ontlaadvenster", xref: "paper", yref: "paper", x: 0, y: 0.32, showarrow: false, xanchor: "left" },
-    ],
+    height: 680, shapes: vensterVormen(t, vens), margin: { l: 60, r: 20, t: 30, b: 100 }, xaxis: { ...TIJDAS, anchor: "y3" },
+    yaxis: { ...vp.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...vp.assen.yaxis2, zeroline: true, zerolinecolor: "#9A9A9A" },
+    yaxis3: { ...vp.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, legend: LEGENDA_ONDER, annotations: vp.annotations,
   }), PL);
 }
 

@@ -18,39 +18,18 @@ class Regelaar:
 
 
 class Referentie(Regelaar):
+    """Strategie 1. WP's volgen de vraag; het buffer wordt met HT-restcapaciteit vol gehouden (pieken en back-up).
+    Onder de minimumlast pendelt een WP; dat blijft zichtbaar als KPI."""
     label = "1 · Referentie"
-    beschrijving = "WP's volgen de vraag; buffer vol houden voor pieken en back-up; HT-lage last via buffer tegen pendelen."
-    """Strategie 1. WP's volgen de vraag. Buffer blijft vol (pieken en back-up).
-
-    Tegen pendelen (optioneel): als de HT-vraag onder de minimumlast van één WP ligt, levert het buffer
-    en staat de WP uit; zakt het buffer onder `soc_laag`, dan draait één WP op minimumlast en gaat het
-    surplus naar het buffer tot `soc_doel`. De LT-WP kan het buffer niet laden en pendelt dus zelf.
-    """
+    beschrijving = "WP's volgen de vraag; buffer vol houden voor pieken en back-up."
     naam = "referentie"
 
     def start(self, cfg, df, buffer):
         super().start(cfg, df, buffer)
-        s = cfg["strategie"].get("referentie", {})
-        self.doel = s.get("soc_doel", 1.0)
-        self.laag = s.get("soc_laag", 0.9)
-        self.via_buffer = s.get("min_last_via_buffer", True)
-        self.p_min = cfg["warmtepompen"]["ht"]["p_min_kw"]
-        self.laden = False
+        self.doel = cfg["strategie"].get("referentie", {}).get("soc_doel", 1.0)
 
     def besluit(self, i, r, buf):
-        herstel = max(0.0, self.doel * buf.e_max - buf.e)
-        if self.via_buffer and 0 < r.q_ht < self.p_min:
-            if self.laden:
-                return {"laad": self.p_min - r.q_ht}
-            if buf.soc < self.laag:
-                self.laden = True
-                return {"laad": self.p_min - r.q_ht}
-            return {"buf_ht": r.q_ht}
-        return {"laad": herstel}
-
-    def na_uur(self, i, r, buf):
-        if buf.soc >= self.doel - 1e-6:
-            self.laden = False
+        return {"laad": max(0.0, self.doel * buf.e_max - buf.e)}
 
 
 class Congestie(Referentie):

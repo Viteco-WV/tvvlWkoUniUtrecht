@@ -2,8 +2,5 @@
 __pycache__/
 *.pyc
 .DS_Store
-simulatie/runs/
-simulatie/resultaten/
-simulatie/scenarios/*
-!simulatie/scenarios/*.yaml
 .pytest_cache/
+simulatie/resultaten/
