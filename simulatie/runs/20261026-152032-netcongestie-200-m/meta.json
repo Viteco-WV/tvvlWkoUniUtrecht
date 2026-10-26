@@ -1,10 +1,10 @@
 {
- "id": "20261026-135651-referentie",
- "scenario_id": "referentie",
- "scenario_naam": "Referentie",
- "omschrijving": "Strategie 1, WP's volgen de vraag, buffer 200 m³",
+ "id": "20261026-152032-netcongestie-200-m",
+ "scenario_id": "netcongestie-200-m",
+ "scenario_naam": "Netcongestie 200 m³",
+ "omschrijving": "WP's uit in venster 08–17 h (adaptief), buffer 200 m³",
  "waarden": {
-  "strategie.naam": "referentie",
+  "strategie.naam": "congestie",
   "congestie.uren_lokaal": [
    8,
    17
@@ -17,8 +17,6 @@
    3
   ],
   "congestie.alleen_werkdagen": true,
-  "strategie.congestie.alles_uit": false,
-  "strategie.congestie.reductie_kwe": 100,
   "strategie.congestie.adaptief": true,
   "buffer.volume_m3": 200,
   "buffer.t_laad_c": 67,
@@ -44,9 +42,10 @@
   "tarieven.inkoop_zomer_eur_kwh": 0.087,
   "tarieven.opslag_piek_eur_kwh": 0.0,
   "tarieven.opslag_dal_eur_kwh": 0.0,
-  "tarieven.energiebelasting_eur_kwh": 0.0
+  "tarieven.energiebelasting_eur_kwh": 0.0,
+  "strategie.congestie.verlaging_pct": 100
  },
- "gestart": "2026-10-26T13:56:51",
+ "gestart": "2026-10-26T15:20:32",
  "status": "klaar",
- "duur_s": 1.6
+ "duur_s": 2.0
 }

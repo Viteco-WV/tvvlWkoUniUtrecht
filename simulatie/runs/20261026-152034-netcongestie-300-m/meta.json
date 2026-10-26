@@ -1,8 +1,8 @@
 {
- "id": "20261026-135653-netcongestie-100-m",
- "scenario_id": "netcongestie-100-m",
- "scenario_naam": "Netcongestie 100 m³",
- "omschrijving": "Als 200 m³, maar buffer 100 m³",
+ "id": "20261026-152034-netcongestie-300-m",
+ "scenario_id": "netcongestie-300-m",
+ "scenario_naam": "Netcongestie 300 m³",
+ "omschrijving": "Als 200 m³, maar buffer 300 m³",
  "waarden": {
   "strategie.naam": "congestie",
   "congestie.uren_lokaal": [
@@ -17,10 +17,8 @@
    3
   ],
   "congestie.alleen_werkdagen": true,
-  "strategie.congestie.alles_uit": true,
-  "strategie.congestie.reductie_kwe": 100,
   "strategie.congestie.adaptief": true,
-  "buffer.volume_m3": 100,
+  "buffer.volume_m3": 300,
   "buffer.t_laad_c": 67,
   "buffer.t_retour_c": 35,
   "buffer.p_max_kw": 880,
@@ -44,9 +42,10 @@
   "tarieven.inkoop_zomer_eur_kwh": 0.087,
   "tarieven.opslag_piek_eur_kwh": 0.0,
   "tarieven.opslag_dal_eur_kwh": 0.0,
-  "tarieven.energiebelasting_eur_kwh": 0.0
+  "tarieven.energiebelasting_eur_kwh": 0.0,
+  "strategie.congestie.verlaging_pct": 100
  },
- "gestart": "2026-10-26T13:56:53",
+ "gestart": "2026-10-26T15:20:34",
  "status": "klaar",
- "duur_s": 1.3
+ "duur_s": 2.6
 }

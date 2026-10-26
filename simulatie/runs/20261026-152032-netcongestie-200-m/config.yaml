@@ -39,7 +39,7 @@ temperatuur:
     - - 15
       - 35.0
 buffer:
-  volume_m3: 300
+  volume_m3: 200
   t_laad_c: 67
   t_retour_c: 35
   dt_wisselaar_k: 2
@@ -83,7 +83,6 @@ strategie:
   referentie:
     soc_doel: 1.0
   congestie:
-    reductie_kwe: 100
-    alles_uit: true
+    verlaging_pct: 100
     adaptief: true
     veiligheid: 0.95

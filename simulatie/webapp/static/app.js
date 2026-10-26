@@ -338,11 +338,18 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") sluitUitleg(); });
 
+// verlaging in het venster; oude runs hadden "volledig uit" of een verlaging in kWe
+function verlagingTekst(w) {
+  const pct = w["strategie.congestie.verlaging_pct"];
+  if (pct !== undefined) return pct >= 100 ? "WP's uit" : `${nl(pct)} % minder vermogen`;
+  return w["strategie.congestie.alles_uit"] ? "WP's uit" : `${nl(w["strategie.congestie.reductie_kwe"])} kWe verlaging`;
+}
+
 async function toonRun(r) {
   const doel = $("#resultaat");
   const w = r.waarden;
   const strategie = w["strategie.naam"] === "congestie"
-    ? `Netcongestie · ${w["strategie.congestie.alles_uit"] ? "WP's uit" : nl(w["strategie.congestie.reductie_kwe"]) + " kWe verlaging"}${w["strategie.congestie.adaptief"] ? " (adaptief)" : ""}`
+    ? `Netcongestie · ${verlagingTekst(w)}${w["strategie.congestie.adaptief"] ? " (adaptief)" : ""}`
     : "Referentie";
   doel.innerHTML = `
     <div class="kaart">

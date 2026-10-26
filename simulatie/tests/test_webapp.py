@@ -30,7 +30,7 @@ def runs(tmp_path_factory):
     d = tmp_path_factory.mktemp("runs")
     return {
         "ref": _draai(d / "ref", "Referentie", {"strategie.naam": "referentie"}),
-        "cong": _draai(d / "cong", "Netcongestie 200 m³", {"strategie.naam": "congestie", "strategie.congestie.alles_uit": True,
+        "cong": _draai(d / "cong", "Netcongestie 200 m³", {"strategie.naam": "congestie", "strategie.congestie.verlaging_pct": 100,
                                                            "buffer.volume_m3": 200}),
     }
 
@@ -107,3 +107,13 @@ def test_scenario_verwijderen_ruimt_resultaten_op(client):
 def test_rapport_vraagt_twee_tot_vier_runs(client):
     assert client.get("/api/rapport?runs=een").status_code == 400
     assert client.get("/api/rapport?runs=a,b").status_code == 404
+
+
+def test_verlaging_in_procenten(tmp_path):
+    """50 % verlaging met een ruim buffer: het WP-vermogen in het venster halveert ongeveer."""
+    ref = _draai(tmp_path / "ref", "Referentie", {"strategie.naam": "referentie"})
+    half = _draai(tmp_path / "half", "50 %", {"strategie.naam": "congestie", "strategie.congestie.verlaging_pct": 50,
+                                               "buffer.volume_m3": 300})
+    g_ref, g_half = (r["kpi"]["elektra"]["gem_kwe_congestievenster"] for r in (ref, half))
+    assert 0.4 < g_half / g_ref < 0.6
+    assert half["kpi"]["warmte"]["tekort_mwh"] == 0

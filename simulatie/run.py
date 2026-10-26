@@ -2,7 +2,7 @@
 (`scenarios/`, `runs/`), dus een run van hier verschijnt ook in de app.
 
     python run.py --scenario netcongestie-200-m                     # bestaand scenario draaien
-    python run.py --naam "Buffer 60 °C" --strategie congestie --set buffer.t_laad_c=60 --set strategie.congestie.alles_uit=true
+    python run.py --naam "Buffer 60 °C" --strategie congestie --set buffer.t_laad_c=60 --set strategie.congestie.verlaging_pct=50
                                                                     # nieuw scenario op basis van config/basis.yaml
 """
 import argparse

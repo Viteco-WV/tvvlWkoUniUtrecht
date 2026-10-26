@@ -15,8 +15,6 @@ waarden:
   - 2
   - 3
   congestie.alleen_werkdagen: true
-  strategie.congestie.alles_uit: false
-  strategie.congestie.reductie_kwe: 100
   strategie.congestie.adaptief: true
   buffer.volume_m3: 200
   buffer.t_laad_c: 67
@@ -43,3 +41,4 @@ waarden:
   tarieven.opslag_piek_eur_kwh: 0.0
   tarieven.opslag_dal_eur_kwh: 0.0
   tarieven.energiebelasting_eur_kwh: 0.0
+  strategie.congestie.verlaging_pct: 100

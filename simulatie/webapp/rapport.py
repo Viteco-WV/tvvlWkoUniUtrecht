@@ -111,7 +111,11 @@ def backup_en_nachten(r, dt):
 
 def strategie_tekst(w):
     if w.get("strategie.naam") == "congestie":
-        s = "WP's uit in het venster" if w.get("strategie.congestie.alles_uit") else f"{nl(w.get('strategie.congestie.reductie_kwe'))} kWe verlagen in het venster"
+        pct = w.get("strategie.congestie.verlaging_pct")
+        if pct is not None:
+            s = "WP's uit in het venster" if pct >= 100 else f"WP's {nl(pct)} % minder vermogen in het venster"
+        else:   # oude runs
+            s = "WP's uit in het venster" if w.get("strategie.congestie.alles_uit") else f"{nl(w.get('strategie.congestie.reductie_kwe'))} kWe verlagen in het venster"
         return s + (" (adaptief)" if w.get("strategie.congestie.adaptief") else "")
     return "Referentie: WP's volgen de vraag"
 

@@ -13,8 +13,8 @@ GROEPEN = [
         {"k": "congestie.uren_lokaal", "label": "Ontlaadvenster", "type": "uren", "status": "afgeleid", "hulp": "Uren (lokale tijd) waarin het buffer de WP's vervangt."},
         {"k": "congestie.maanden", "label": "Periode", "type": "maandbereik", "status": "afgeleid"},
         {"k": "congestie.alleen_werkdagen", "label": "Alleen werkdagen", "type": "bool", "status": "afgeleid"},
-        {"k": "strategie.congestie.alles_uit", "label": "WP's volledig uit in het venster", "type": "bool", "status": "aanname", "alleen": "congestie"},
-        {"k": "strategie.congestie.reductie_kwe", "label": "Gevraagde verlaging", "eenheid": "kWe", "type": "number", "min": 0, "max": 1000, "step": 5, "status": "aanname", "alleen": "congestie", "verberg_als": "strategie.congestie.alles_uit"},
+        {"k": "strategie.congestie.verlaging_pct", "label": "Verlaging in het venster", "eenheid": "%", "type": "number", "min": 0, "max": 100, "step": 5, "status": "aanname", "alleen": "congestie",
+         "hulp": "Percentage van het vermogen dat de WP's zonder verlaging zouden vragen. 100 % = volledig uit, 50 % = half zo hard."},
         {"k": "strategie.congestie.adaptief", "label": "Adaptief: per dag begrenzen tot wat in het buffer past", "type": "bool", "status": "aanname", "alleen": "congestie", "geavanceerd": True},
     ]},
     {"id": "buffer", "titel": "Buffer", "velden": [
@@ -85,6 +85,8 @@ def waarden_uit_config(cfg):
 
 def config_uit_waarden(basis, waarden):
     cfg = copy.deepcopy(basis)
+    if "strategie.congestie.alles_uit" in waarden and "strategie.congestie.verlaging_pct" not in waarden:   # oude scenario's
+        waarden = {**waarden, "strategie.congestie.verlaging_pct": 100}
     for k, v in waarden.items():
         if k not in SLEUTELS:          # vervallen invoer (bv. vraaggestuurd, condensortoggle) negeren
             continue

@@ -83,7 +83,6 @@ strategie:
   referentie:
     soc_doel: 1.0
   congestie:
-    reductie_kwe: 100
-    alles_uit: false
+    verlaging_pct: 100
     adaptief: true
     veiligheid: 0.95

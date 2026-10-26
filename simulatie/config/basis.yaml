@@ -58,7 +58,6 @@ strategie:
   referentie:
     soc_doel: 1.0                                              # buffer vol houden (back-up), laden met HT-restcapaciteit
   congestie:
-    reductie_kwe: 100                                          # [aanname] gevraagde verlaging in het venster
-    alles_uit: false                                           # true = WP's volledig uit in het venster
+    verlaging_pct: 100                                         # [aanname] % van het WP-vermogen dat in het venster wegvalt; 100 = uit
     adaptief: true                                             # verlaging per dag begrenzen tot wat in het buffer past
     veiligheid: 0.95                                           # deel van de buffervulling dat mag worden ingezet
