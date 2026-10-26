@@ -56,4 +56,6 @@ Zonder Docker start je de app met `uvicorn webapp.main:app --app-dir simulatie -
 | `data/prijzen/dayahead_nl_op_simulatiejaar.csv` | Day-ahead NL 2024/2025 (Bundesnetzagentur / SMARD via energy-charts.info, CC BY 4.0) |
 | `simulatie/scenarios/`, `simulatie/runs/` | Referentie en netcongestie met 100, 200 en 300 m³, doorgerekend met de data hierboven en voorbeeldtarieven |
 
+Het logo en de favicon in `simulatie/webapp/static/img/` zijn beeldmerken van de Universiteit Utrecht. Ze vallen onder de merkregels van de UU en vallen niet onder een open licentie.
+
 De officiële NEN 5060-reeks, de campusdata en de contracttarieven zitten **niet** in deze repo. De tarieven in `simulatie/config/basis.yaml` en in de scenario's zijn openbare voorbeeldwaarden. De uitkomsten wijken daardoor iets af van de interne projectresultaten.
