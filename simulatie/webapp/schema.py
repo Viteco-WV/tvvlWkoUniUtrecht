@@ -36,6 +36,13 @@ GROEPEN = [
         {"k": "cop.eta_carnot", "label": "Carnot-rendement η", "type": "number", "min": 0.3, "max": 0.7, "step": 0.01, "status": "afgeleid", "geavanceerd": True, "hulp": "0,55 geeft COP 4,5 bij 45 °C en ≈ 2,95 bij 70 °C."},
         {"k": "cop.t_verdamper_c", "label": "Verdampertemperatuur", "eenheid": "°C", "type": "number", "min": -5, "max": 15, "step": 0.5, "status": "bron", "geavanceerd": True},
     ]},
+    {"id": "aansluiting", "titel": "Elektrische aansluiting", "velden": [
+        {"k": "aansluiting.kva", "label": "Aansluitvermogen", "eenheid": "kVA", "type": "number", "min": 0, "max": 10000, "step": 5, "status": "bron",
+         "hulp": "Grens voor de WP's = kVA × cos φ − overige gebruikers. Wordt gerapporteerd (uren en kWe boven de grens); het model begrenst de WP's niet."},
+        {"k": "aansluiting.cos_phi", "label": "Arbeidsfactor cos φ", "type": "number", "min": 0.5, "max": 1, "step": 0.01, "status": "aanname", "geavanceerd": True},
+        {"k": "aansluiting.overig_kwe", "label": "Gereserveerd voor overige gebruikers", "eenheid": "kWe", "type": "number", "min": 0, "max": 5000, "step": 5, "status": "aanname", "geavanceerd": True,
+         "hulp": "Bijvoorbeeld transportpompen, koelmachines, ventilatie en verlichting op dezelfde kabel."},
+    ]},
     {"id": "temperatuur", "titel": "Stooklijn (aanvoertemperatuur)", "velden": [
         {"k": "stooklijn.ht.m10", "label": "HT bij −10 °C buiten", "eenheid": "°C", "type": "number", "min": 30, "max": 80, "step": 1, "status": "aanname"},
         {"k": "stooklijn.ht.p15", "label": "HT bij +15 °C buiten", "eenheid": "°C", "type": "number", "min": 30, "max": 80, "step": 1, "status": "aanname"},

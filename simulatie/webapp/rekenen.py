@@ -8,7 +8,7 @@ import yaml
 from botu_sim import worstcase
 from botu_sim.data import laad_invoer
 from botu_sim.flexibiliteit import envelop
-from botu_sim.kpi import bereken
+from botu_sim.kpi import aansluiting, bereken
 from botu_sim.simulatie import simuleer
 from botu_sim.strategieen import maak_regelaar
 
@@ -151,3 +151,12 @@ def nacht(u, datum, cap):
             "ht_wp_kw": round(float(s["q_htwp"].mean())), "laden_mwh": round(float(s["laad"].sum()) / 1000, 2),
             "vrij_kw": round(float((cap - s["q_htwp"]).mean())), "vol_uren": int((s["q_htwp"] >= cap - 1).sum()),
             "soc_start": round(float(u.loc[s.index[0] - 1, "soc"]) * 100), "soc_eind": round(float(s["soc"].iloc[-1]) * 100)}
+
+
+def kpi_met_aansluiting(map_, kpi, cfg, standaard=None):
+    """Voegt de aansluiting-KPI toe aan runs van vóór die KPI (berekend uit de opgeslagen uurdata)."""
+    if "aansluiting" not in kpi:
+        el = pd.read_csv(map_ / "uurdata.csv", usecols=["el"])["el"]
+        kpi["aansluiting"] = aansluiting(el, cfg.get("aansluiting", standaard))
+    return kpi
+

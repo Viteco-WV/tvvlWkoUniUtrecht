@@ -13,6 +13,11 @@ warmtepompen:
   ht: {aantal: 2, p_max_kw: 205, p_min_kw: 103}                # [bron] P&ID / BOD
   lt: {aantal: 1, p_max_kw: 105, p_min_kw: 53}                 # [bron] P&ID / BOD
 
+aansluiting:                                                   # elektrische aansluiting kassencomplex
+  kva: 200                                                     # [bron] kabel 200 kVA = afgezekerde waarde (projectteam); trafo 1.000 kVA
+  cos_phi: 0.95                                                # [aanname] arbeidsfactor -> 190 kWe
+  overig_kwe: 0                                                # [aanname] vermogen gereserveerd voor overige gebruikers op dezelfde kabel
+
 cop:
   eta_carnot: 0.55                                             # [afgeleid] Dutek-werkpunten; COP 4,5 bij 45 °C [aanname]
   t_verdamper_c: 6.0                                           # [bron] BOD bron 16/6 °C

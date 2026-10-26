@@ -1,8 +1,9 @@
 id: netcongestie-100-m
-naam: Netcongestie 100 m³ - 2
-omschrijving: Als 200 m³, maar buffer 100 m³
-aangemaakt: '2026-10-26T00:00:00'
-gewijzigd: '2026-10-26T00:00:00'
+naam: Netcongestie 100 m³
+omschrijving: WP's 100 % uit in het venster (werkdagen 08–17 h, nov–mrt, adaptief),
+  buffer 100 m³
+aangemaakt: '2026-10-26T16:03:38'
+gewijzigd: '2026-10-26T16:03:38'
 waarden:
   strategie.naam: congestie
   congestie.uren_lokaal:
@@ -15,6 +16,7 @@ waarden:
   - 2
   - 3
   congestie.alleen_werkdagen: true
+  strategie.congestie.verlaging_pct: 100
   strategie.congestie.adaptief: true
   buffer.volume_m3: 100
   buffer.t_laad_c: 67
@@ -22,7 +24,7 @@ waarden:
   buffer.p_max_kw: 880
   buffer.dt_wisselaar_k: 2
   buffer.ua_kw_per_k: 0.07
-  buffer.soc_start: 1
+  buffer.soc_start: 1.0
   warmtepompen.ht.aantal: 2
   warmtepompen.ht.p_max_kw: 205
   warmtepompen.ht.p_min_kw: 103
@@ -30,7 +32,10 @@ waarden:
   warmtepompen.lt.p_max_kw: 105
   warmtepompen.lt.p_min_kw: 53
   cop.eta_carnot: 0.55
-  cop.t_verdamper_c: 6
+  cop.t_verdamper_c: 6.0
+  aansluiting.kva: 200
+  aansluiting.cos_phi: 0.95
+  aansluiting.overig_kwe: 0
   stooklijn.ht.m10: 65
   stooklijn.ht.p15: 55
   stooklijn.lt.m10: 45
@@ -41,4 +46,3 @@ waarden:
   tarieven.opslag_piek_eur_kwh: 0.0
   tarieven.opslag_dal_eur_kwh: 0.0
   tarieven.energiebelasting_eur_kwh: 0.0
-  strategie.congestie.verlaging_pct: 100

@@ -178,11 +178,12 @@ def get_run(rid: str):
         raise HTTPException(404, "run niet gevonden")
     if m["status"] == "klaar":
         d = RUNS / rid
-        m["kpi"] = json.loads((d / "kpi.json").read_text())
+        cfg = yaml.safe_load((d / "config.yaml").read_text())
+        m["kpi"] = rekenen.kpi_met_aansluiting(d, json.loads((d / "kpi.json").read_text()), cfg, BASIS.get("aansluiting"))
         m["typedagen"] = json.loads((d / "typedagen.json").read_text())
         m["flex"] = json.loads((d / "flex.json").read_text())
         m["worstcase"] = json.loads((d / "worstcase.json").read_text())
-        m["max_vermogen"] = max_vermogen(yaml.safe_load((d / "config.yaml").read_text()))   # uit de opgeslagen config, ook voor oude runs
+        m["max_vermogen"] = max_vermogen(cfg)   # uit de opgeslagen config, ook voor oude runs
     return m
 
 

@@ -1,8 +1,8 @@
 {
- "id": "20261026-152034-netcongestie-300-m",
- "scenario_id": "netcongestie-300-m",
- "scenario_naam": "Netcongestie 300 m³",
- "omschrijving": "Als 200 m³, maar buffer 300 m³",
+ "id": "20261026-191920-netcongestie-100-m",
+ "scenario_id": "netcongestie-100-m",
+ "scenario_naam": "Netcongestie 100 m³",
+ "omschrijving": "WP's 100 % uit in het venster (werkdagen 08–17 h, nov–mrt, adaptief), buffer 100 m³",
  "waarden": {
   "strategie.naam": "congestie",
   "congestie.uren_lokaal": [
@@ -17,8 +17,9 @@
    3
   ],
   "congestie.alleen_werkdagen": true,
+  "strategie.congestie.verlaging_pct": 100,
   "strategie.congestie.adaptief": true,
-  "buffer.volume_m3": 300,
+  "buffer.volume_m3": 100,
   "buffer.t_laad_c": 67,
   "buffer.t_retour_c": 35,
   "buffer.p_max_kw": 880,
@@ -33,6 +34,9 @@
   "warmtepompen.lt.p_min_kw": 53,
   "cop.eta_carnot": 0.55,
   "cop.t_verdamper_c": 6.0,
+  "aansluiting.kva": 200,
+  "aansluiting.cos_phi": 0.95,
+  "aansluiting.overig_kwe": 0,
   "stooklijn.ht.m10": 65,
   "stooklijn.ht.p15": 55,
   "stooklijn.lt.m10": 45,
@@ -42,10 +46,9 @@
   "tarieven.inkoop_zomer_eur_kwh": 0.087,
   "tarieven.opslag_piek_eur_kwh": 0.0,
   "tarieven.opslag_dal_eur_kwh": 0.0,
-  "tarieven.energiebelasting_eur_kwh": 0.0,
-  "strategie.congestie.verlaging_pct": 100
+  "tarieven.energiebelasting_eur_kwh": 0.0
  },
- "gestart": "2026-10-26T15:20:34",
+ "gestart": "2026-10-26T19:19:20",
  "status": "klaar",
- "duur_s": 2.6
+ "duur_s": 1.4
 }

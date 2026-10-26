@@ -25,7 +25,7 @@ from reportlab.platypus import (CondPageBreak, Image, KeepTogether, PageBreak, P
 
 from botu_sim.kpi import max_vermogen  # noqa: E402
 from . import schema  # noqa: E402
-from .rekenen import dag_backup, nacht, vensterdagen  # noqa: E402
+from .rekenen import dag_backup, kpi_met_aansluiting, nacht, vensterdagen  # noqa: E402
 
 LOGO = os.path.join(os.path.dirname(__file__), "static/img/uu-logo.png")
 RUNKLEUR = ["#001240", "#C00A35", "#24A793", "#F3965E"]     # gelijk aan de webapp
@@ -81,7 +81,7 @@ def laad_run(map_):
     u["venster"] = u["congestievenster"].astype(str).eq("True")
     return {
         "map": map_, "meta": meta, "cfg": cfg, "u": u, "w": meta["waarden"],
-        "kpi": json.loads((map_ / "kpi.json").read_text()),
+        "kpi": kpi_met_aansluiting(map_, json.loads((map_ / "kpi.json").read_text()), cfg),
         "flex": json.loads((map_ / "flex.json").read_text()),
         "typedagen": json.loads((map_ / "typedagen.json").read_text()),
         "vd": vensterdagen(u), "max": max_vermogen(cfg),
@@ -198,6 +198,11 @@ def fig_koud(runs, start, dagen):
             if not v and aan is not None:
                 ax.axvspan(aan, t, color=GEEL, alpha=0.25, lw=0)
                 aan = None
+    grenzen = sorted({r["kpi"]["aansluiting"]["grens_kwe"] for r in runs})
+    for g in grenzen:
+        a.axhline(g, color=ROOD, lw=1.2, ls="--")
+        a.text(s["t_lokaal"].iloc[0], g, f" aansluiting {nl(g)} kWe", color=ROOD, fontsize=6.5, va="bottom")
+    a.set_ylim(0, max(max(grenzen) * 1.12, a.get_ylim()[1]))
     a.set_ylabel("kWe")
     a.set_title("Elektrisch vermogen warmtepompen · geel = ontlaadvenster (run 1)", fontsize=8.5, loc="left", color=ZWART)
     a.legend(fontsize=7, loc="upper center", bbox_to_anchor=(0.5, -0.02), ncol=len(runs))
@@ -249,6 +254,10 @@ KPI = [  # label, functie(run) → waarde, richting (−1 = lager is beter), dec
     ("Energiekosten WP's", lambda r: r["kpi"]["kosten"]["inkoop_vast_eur"], -1, 0, "€"),
     ("kW-max WP's in venster (indicatie)", lambda r: r["kpi"]["kosten"]["indicatie_kwmax_venster_eur"], -1, 0, "€"),
     ("Warmtetekort", lambda r: r["kpi"]["warmte"]["tekort_mwh"], -1, 1, "MWh"),
+    ("Aansluiting: grens WP's", lambda r: r["kpi"]["aansluiting"]["grens_kwe"], 0, 0, "kWe"),
+    ("Aansluiting: uren overschreden", lambda r: r["kpi"]["aansluiting"]["uren_boven"], -1, 0, "h"),
+    ("Aansluiting: max. overschrijding", lambda r: r["kpi"]["aansluiting"]["max_overschrijding_kwe"], -1, 0, "kWe"),
+    ("Aansluiting: energie boven grens", lambda r: r["kpi"]["aansluiting"]["kwh_boven"], -1, 0, "kWh"),
 ]
 
 
@@ -268,7 +277,7 @@ def kpi_tabel(runs):
                 tekst += f' <font color="{kleur}" size="7">({"+" if pct > 0 else ""}{nl(pct)} %)</font>'
             if lab == "Pendeluren HT / LT":
                 tekst = f"{nl(r['kpi']['bedrijf']['ht_pendeluren'])} / {nl(r['kpi']['bedrijf']['lt_pendeluren'])}"
-            if lab == "Warmtetekort" and v > 0:
+            if (lab == "Warmtetekort" or lab.startswith("Aansluiting: uren")) and v > 0:
                 tekst = f'<font color="{ROOD}"><b>{tekst}</b></font>'
             rij.append(P(tekst, "celr"))
         rijen.append(rij)
@@ -297,6 +306,11 @@ def samenvatting(runs, dt):
             dagen = sorted({dag_label(x) for x in uren["t_lokaal"].dt.date})
             uit.append(f'<font color="{ROOD}"><b>Let op, run {i + 1}:</b></font> {nl(t["tekort_mwh"], 1)} MWh warmtetekort in {t["tekort_uren"]} uur '
                        f"({', '.join(dagen)}). De HT-vraag is dan hoger dan de HT-WP's leveren en het buffer is leeg.")
+    for i, r in enumerate(runs):
+        a = r["kpi"]["aansluiting"]
+        if a["uren_boven"]:
+            uit.append(f'<font color="{ROOD}"><b>Aansluiting, run {i + 1}:</b></font> het WP-vermogen komt {a["uren_boven"]} uur boven de grens van '
+                       f"{nl(a['grens_kwe'])} kWe ({nl(a['kva'])} kVA), met maximaal {nl(a['max_overschrijding_kwe'])} kWe en {nl(a['kwh_boven'])} kWh erboven.")
     laatste = dt["koud"][0] if not runs[0]["datums"] else runs[0]["datums"][-1]
     res = [f"run {i + 1}: {r['backup'][laatste]['nu_h'] if r['backup'].get(laatste) else '–'} h" for i, r in enumerate(runs)]
     uit.append(f"<b>Koude reeks</b> ({dag_label(dt['koud'][0])} t/m {dag_label(laatste)}): werkelijke reserve om "
@@ -304,12 +318,18 @@ def samenvatting(runs, dt):
     koud = runs[0]["datums"][2:-1]
     if koud:
         flexruns = [r for r in runs if r["w"].get("strategie.naam") == "congestie"] or runs   # referentie laadt weinig: buffer is al vol
-        laad = [r["nachten"][d]["laden_mwh"] for r in flexruns for d in koud]
+        cap = lambda r: r["cfg"]["warmtepompen"]["ht"]["aantal"] * r["cfg"]["warmtepompen"]["ht"]["p_max_kw"]
         vraag = [runs[0]["nachten"][d]["ht_vraag_kw"] for d in koud]
-        cap = runs[0]["cfg"]["warmtepompen"]["ht"]["aantal"] * runs[0]["cfg"]["warmtepompen"]["ht"]["p_max_kw"]
-        uit.append(f"<b>Bijladen 's nachts:</b> in de koude nachten is de HT-vraag gemiddeld {nl(min(vraag))}–{nl(max(vraag))} kW, "
-                   f"bij {nl(cap)} kW HT-vermogen. Er gaat dan maar {nl(min(laad), 2)}–{nl(max(laad), 2)} MWh per nacht in het buffer, "
-                   "ongeacht de buffergrootte: de reserve wordt vooral bepaald door de voorraad aan het begin van de reeks.")
+        if len({cap(r) for r in flexruns}) == 1:
+            laad = [r["nachten"][d]["laden_mwh"] for r in flexruns for d in koud]
+            uit.append(f"<b>Bijladen 's nachts:</b> in de koude nachten is de HT-vraag gemiddeld {nl(min(vraag))}–{nl(max(vraag))} kW, "
+                       f"bij {nl(cap(flexruns[0]))} kW HT-vermogen. Er gaat dan maar {nl(min(laad), 2)}–{nl(max(laad), 2)} MWh per nacht in het buffer, "
+                       "ongeacht de buffergrootte: de reserve wordt vooral bepaald door de voorraad aan het begin van de reeks.")
+        else:   # verschillend HT-vermogen: per run, want dat bepaalt juist het bijladen
+            per = [f"run {runs.index(r) + 1} (HT {nl(cap(r))} kW): {nl(min(r['nachten'][d]['laden_mwh'] for d in koud), 2)}–"
+                   f"{nl(max(r['nachten'][d]['laden_mwh'] for d in koud), 2)} MWh" for r in flexruns]
+            uit.append(f"<b>Bijladen 's nachts:</b> in de koude nachten is de HT-vraag gemiddeld {nl(min(vraag))}–{nl(max(vraag))} kW. "
+                       f"Per nacht gaat er in het buffer: {' · '.join(per)}. Het HT-vermogen bepaalt hoeveel er bijgeladen kan worden.")
     return uit
 
 
@@ -442,6 +462,8 @@ def maak_rapport(mappen):
          "de volledige vraag dekt."),
         ("Kosten", "Energiekosten met het tarief uit het scenario; kW-max is een indicatie op basis van de maandpieken in het venster."),
         ("Warmtetekort", "Warmte die in een uur niet geleverd kan worden: de vraag is groter dan WP's plus buffer."),
+        ("Aansluiting", "Grens voor de WP's = aansluitvermogen (kVA) × cos φ − vermogen voor overige gebruikers. Gerapporteerd wordt hoe vaak "
+         "en hoeveel het WP-vermogen (uurwaarden) erboven komt; het model begrenst de WP's niet."),
     ]
     verhaal += [CondPageBreak(70 * mm), P("Toelichting op de kerncijfers", "h2")]
     verhaal += [Paragraph(f"<b>{a}.</b> {b}", ST["bullet"], bulletText="•") for a, b in uitleg]

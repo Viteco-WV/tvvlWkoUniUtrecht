@@ -1,8 +1,9 @@
 id: netcongestie-300-m
 naam: Netcongestie 300 m³
-omschrijving: Als 200 m³, maar buffer 300 m³
-aangemaakt: '2026-10-26T00:00:00'
-gewijzigd: '2026-10-26T00:00:00'
+omschrijving: WP's 100 % uit in het venster (werkdagen 08–17 h, nov–mrt, adaptief),
+  buffer 300 m³
+aangemaakt: '2026-10-26T16:03:42'
+gewijzigd: '2026-10-26T16:03:42'
 waarden:
   strategie.naam: congestie
   congestie.uren_lokaal:
@@ -15,6 +16,7 @@ waarden:
   - 2
   - 3
   congestie.alleen_werkdagen: true
+  strategie.congestie.verlaging_pct: 100
   strategie.congestie.adaptief: true
   buffer.volume_m3: 300
   buffer.t_laad_c: 67
@@ -31,6 +33,9 @@ waarden:
   warmtepompen.lt.p_min_kw: 53
   cop.eta_carnot: 0.55
   cop.t_verdamper_c: 6.0
+  aansluiting.kva: 200
+  aansluiting.cos_phi: 0.95
+  aansluiting.overig_kwe: 0
   stooklijn.ht.m10: 65
   stooklijn.ht.p15: 55
   stooklijn.lt.m10: 45
@@ -41,4 +46,3 @@ waarden:
   tarieven.opslag_piek_eur_kwh: 0.0
   tarieven.opslag_dal_eur_kwh: 0.0
   tarieven.energiebelasting_eur_kwh: 0.0
-  strategie.congestie.verlaging_pct: 100

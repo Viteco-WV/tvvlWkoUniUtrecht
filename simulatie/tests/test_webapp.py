@@ -117,3 +117,15 @@ def test_verlaging_in_procenten(tmp_path):
     g_ref, g_half = (r["kpi"]["elektra"]["gem_kwe_congestievenster"] for r in (ref, half))
     assert 0.4 < g_half / g_ref < 0.6
     assert half["kpi"]["warmte"]["tekort_mwh"] == 0
+
+
+def test_aansluiting_overschrijding(runs, tmp_path):
+    """Ontwerp (2 × 205 kW HT) blijft onder 200 kVA; 2 × 250 kW HT gaat er bij het nachtelijk bijladen overheen."""
+    a = runs["cong"]["kpi"]["aansluiting"]
+    assert a["grens_kwe"] == pytest.approx(190) and a["uren_boven"] == 0
+    groot = _draai(tmp_path / "groot", "HT 2×250", {"strategie.naam": "congestie", "strategie.congestie.verlaging_pct": 100,
+                                                     "warmtepompen.ht.p_max_kw": 250})
+    g = groot["kpi"]["aansluiting"]
+    assert g["uren_boven"] > 0 and 0 < g["max_overschrijding_kwe"] < 20 and g["kwh_boven"] > 0
+    boven = groot["u"][groot["u"]["el"] > g["grens_kwe"]]
+    assert not boven["congestievenster"].astype(str).eq("True").any()          # overschrijding buiten het venster (bijladen)

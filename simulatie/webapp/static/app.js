@@ -29,20 +29,28 @@ const layoutBasis = (extra = {}) => ({
 });
 
 // gestapelde panelen met vaste tussenruimte; titel net boven elk paneel
+// gestapelde panelen met vaste tussenruimte; per paneel de titel met daaronder een eigen legenda (legend, legend2, …).
+// Let op: zet `showlegend: true` in de layout, anders verbergt Plotly bij meerdere legenda's de eerste.
 function panelen(hoogtes, titels, gat = 0.075) {
   const schaal = (1 - gat * (hoogtes.length - 1)) / hoogtes.reduce((a, b) => a + b, 0);
-  const uit = { assen: {}, annotations: [] };
+  const uit = { assen: {}, annotations: [], legendes: {} };
   let top = 1;
   hoogtes.forEach((h, i) => {
     const onder = top - h * schaal;
     uit.assen[i === 0 ? "yaxis" : `yaxis${i + 1}`] = { domain: [Math.max(0, onder), top] };
-    uit.annotations.push({ text: titels[i], xref: "paper", yref: "paper", x: 0, y: top, yshift: 6, yanchor: "bottom", xanchor: "left", showarrow: false });
+    uit.annotations.push({ text: titels[i], xref: "paper", yref: "paper", x: 0, y: top, yshift: 26, yanchor: "bottom", xanchor: "left", showarrow: false });
+    uit.legendes[i === 0 ? "legend" : `legend${i + 1}`] = { orientation: "h", x: 0, xanchor: "left", y: top, yanchor: "bottom", yref: "paper",
+      font: { size: 11 }, bgcolor: "rgba(0,0,0,0)", itemwidth: 30 };
     top = onder - gat;
   });
   return uit;
 }
+
+// koppel elk spoor aan de legenda van zijn paneel; `paneel` vertaalt een y-as naar het paneelnummer (1, 2, …)
+function legendaPerPaneel(sporen, paneel) {
+  sporen.forEach((sp) => { const n = paneel[sp.yaxis || "y"]; sp.legend = n === 1 ? "legend" : `legend${n}`; });
+}
 const TIJDAS = { type: "date", tickformat: "%H:%M<br>%d-%m", hoverformat: "%d-%m %H:%M", showgrid: true };
-const LEGENDA_ONDER = { orientation: "h", x: 0, xanchor: "left", y: -0.09, yanchor: "top" };
 
 /* ------------------------------------------------------------------ router */
 async function route() {
@@ -262,7 +270,8 @@ const info = (titel, html) => `<button class="info" type="button" aria-label="Ui
 // uitleg bij de grafieken; w = scenariowaarden van de (eerste) run
 const UITLEG = {
   dag: (w) => `<b>Wat:</b> het uurbeeld van de gekozen dag(en), van boven naar beneden:
-    het elektrisch vermogen van de HT- en LT-WP's; het laden (+) en ontladen (−) van het buffer; de buffervulling; en de warmtevraag per net met de buitentemperatuur.
+    de warmte uit de HT-WP's, verdeeld over de kassen en het buffer; het elektrisch vermogen van de HT- en LT-WP's; het laden (+) en ontladen (−) van het buffer; de buffervulling; en de warmtevraag per net met de buitentemperatuur.
+    <b>Stippellijnen:</b> zwart is het maximale warmtevermogen van de HT-WP's (aantal × vermogen per WP). Raken de staven die lijn, dan kan het buffer niet sneller laden. Rood is de grens van de elektrische aansluiting.
     <b>Geel:</b> het ontlaadvenster (${vensterTekst(w)}). Daarin levert het buffer de warmte en gaan de WP's omlaag of uit.
     <b>Back-up-tabel:</b> per dag hoeveel uur het buffer alleen de vraag kan dekken als alle WP's aan het begin van het venster uitgaan.`,
   heat: () => `<b>Wat:</b> elk vakje is één uur van het jaar. Horizontaal staat de dag, verticaal het uur van de dag (lokale tijd). De kleur is het elektrisch vermogen van de WP's samen.
@@ -288,7 +297,7 @@ const UITLEG = {
 };
 
 function kpiKaarten(k, wc, w, mx) {
-  const e = k.elektra;
+  const e = k.elektra, a = k.aansluiting;
   const venster = vensterTekst(w);
   const items = [
     [nl(e.totaal_mwhe) + " MWhe", "elektriciteit warmtepompen / jaar",
@@ -301,8 +310,12 @@ function kpiKaarten(k, wc, w, mx) {
        <b>Telt mee:</b> alle warmte die de WP's leveren, zowel direct aan de netten als voor het laden van het buffer.
        <b>Telt niet mee:</b> de condensorwarmte van de ZLT-koelmachine. Bufferverliezen drukken de SPF dus niet, maar kosten wel extra laadwerk.
        <div class="formule">SPF = Σ Q<sub>WP</sub> ÷ Σ E<sub>el,WP</sub></div>Hoger = efficiënter.`],
-    [nl(e.piek_kwe) + " kWe", `piek elektrisch vermogen${mx ? ` (max. ${nl(mx.totaal_kwe)} kWe)` : ""}`,
+    [nl(e.piek_kwe) + " kWe", `piek elektrisch vermogen (${[mx ? `max. ${nl(mx.totaal_kwe)}` : "", a ? `aansluiting ${nl(a.grens_kwe)}` : ""].filter(Boolean).join(" · ")} kWe)`
+        + (a && a.uren_boven ? ` · <span class="slechter">${nl(a.uren_boven)} h erboven</span>` : ""),
       `<b>Wat:</b> het hoogste elektrische vermogen van de warmtepompen samen in het hele jaar, binnen én buiten het ontlaadvenster.
+       ${a ? `<b>Aansluiting:</b> grens voor de WP's ${nl(a.grens_kwe)} kWe (${nl(a.kva)} kVA × cos φ − overige gebruikers).
+       ${a.uren_boven ? `Overschreden in <b>${nl(a.uren_boven)} uur</b>, met maximaal ${nl(a.max_overschrijding_kwe)} kWe en ${nl(a.kwh_boven)} kWh boven de grens.` : "Nergens overschreden."}
+       Het model begrenst de WP's niet; dit laat zien wat de gekozen instellingen van de aansluiting vragen.` : ""}
        ${mx ? `<b>Max. tussen haakjes:</b> wat de WP's samen maximaal kunnen vragen: alle WP's op hun maximale thermische vermogen bij de slechtste COP.
        <div class="formule">HT ${nl(w["warmtepompen.ht.aantal"])} × ${nl(w["warmtepompen.ht.p_max_kw"])} kW bij ${nl(mx.ht.t_c)} °C, COP ${nl(mx.ht.cop, 2)} → ${nl(mx.ht.kwe)} kWe<br>
        LT ${nl(w["warmtepompen.lt.aantal"])} × ${nl(w["warmtepompen.lt.p_max_kw"])} kW bij ${nl(mx.lt.t_c)} °C, COP ${nl(mx.lt.cop, 2)} → ${nl(mx.lt.kwe)} kWe</div>
@@ -320,7 +333,7 @@ function kpiKaarten(k, wc, w, mx) {
        <div class="formule">kortst ${nl(wc.kortst_h)} h · mediaan ${nl(wc.mediaan_h)} h</div>
        <b>Let op:</b> dit is een jaarcijfer met steeds een vol buffer. Per dag, ook vanaf de werkelijke vulling in de simulatie, zie je het in de deep dive.`],
   ];
-  return `<div class="kpis">${items.map(([v, l, uitleg]) => `<div class="kpi">${info(l, uitleg)}<div class="w">${v}</div><div class="l">${l}</div></div>`).join("")}</div>`;
+  return `<div class="kpis">${items.map(([v, l, uitleg]) => `<div class="kpi">${info(l.replace(/<[^>]+>/g, ""), uitleg)}<div class="w">${v}</div><div class="l">${l}</div></div>`).join("")}</div>`;
 }
 
 // één uitleg-popup tegelijk; sluit bij klik buiten de popup of met Escape
@@ -348,6 +361,8 @@ function verlagingTekst(w) {
 async function toonRun(r) {
   const doel = $("#resultaat");
   const w = r.waarden;
+  S.grens = r.kpi.aansluiting?.grens_kwe;
+  S.htMax = (w["warmtepompen.ht.aantal"] || 0) * (w["warmtepompen.ht.p_max_kw"] || 0);   // maximaal warmtevermogen HT-WP's
   const strategie = w["strategie.naam"] === "congestie"
     ? `Netcongestie · ${verlagingTekst(w)}${w["strategie.congestie.adaptief"] ? " (adaptief)" : ""}`
     : "Referentie";
@@ -410,6 +425,19 @@ function tekenBackup(rijen) {
     <div class="eenheid">"Vanaf vol" is het theoretische maximum op deze dag; "werkelijk" gaat uit van de vulling die het buffer in deze simulatie op dat moment heeft. Rood = minder dan 24 h.</div></div>`;
 }
 
+// "2001-01-15T16:00" + 1 uur, in lokale notatie (toISOString zou naar UTC omrekenen en een uur verschuiven)
+function plusUur(t) {
+  const d = new Date(t); d.setHours(d.getHours() + 1);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
+}
+
+// horizontale stippellijn op de grens van de elektrische aansluiting
+function grensSpoor(t, grens, kleur = "#C00A35", naam, yaxis = "y") {
+  return { x: [t[0], plusUur(t[t.length - 1])], y: [grens, grens], mode: "lines", name: naam || `aansluiting ${nl(grens)} kWe`,
+    line: { color: kleur, width: 2, dash: "dash" }, xaxis: "x", yaxis, hoverinfo: "skip" };
+}
+
 function vensterVormen(t, vens) {
   const vormen = [];
   let i = 0;
@@ -417,7 +445,7 @@ function vensterVormen(t, vens) {
     if (vens[i]) {
       let j = i;
       while (j + 1 < vens.length && vens[j + 1]) j++;
-      const eind = new Date(new Date(t[j]).getTime() + 3600e3).toISOString().slice(0, 16);
+      const eind = plusUur(t[j]);
       vormen.push({ type: "rect", xref: "x", yref: "paper", x0: t[i], x1: eind, y0: 0, y1: 1, fillcolor: K.venster, line: { width: 0 }, layer: "below" });
       i = j + 1;
     } else i++;
@@ -430,24 +458,36 @@ async function tekenDag(rid) {
   tekenBackup(d.backup);
   const t = d.t_lokaal, vens = d.congestievenster.map((v) => v === true || v === "True");
   const ontl = d.buf_ht.map((v, i) => -(v + d.buf_lt[i]));
+  const staaf = (y, name, color, yaxis) => ({ x: t, y, name, type: "bar", marker: { color }, xaxis: "x", yaxis, offset: 0, width: 3600e3 });
   const sporen = [
-    { x: t, y: d.el_ht, name: "WP HT [kWe]", type: "bar", marker: { color: K.ht }, xaxis: "x", yaxis: "y", offset: 0, width: 3600e3 },
-    { x: t, y: d.el_lt, name: "WP LT [kWe]", type: "bar", marker: { color: K.lt }, xaxis: "x", yaxis: "y", offset: 0, width: 3600e3 },
-    { x: t, y: d.laad, name: "buffer laden [kW]", type: "bar", marker: { color: K.buffer }, xaxis: "x", yaxis: "y2", offset: 0, width: 3600e3 },
-    { x: t, y: ontl, name: "buffer ontladen [kW]", type: "bar", marker: { color: "#AA1555" }, xaxis: "x", yaxis: "y2", offset: 0, width: 3600e3 },
-    { x: t, y: d.soc.map((v) => v * 100), name: "buffervulling [%]", line: { color: K.soc, width: 3, shape: "hv" }, xaxis: "x", yaxis: "y3" },
-    { x: t, y: d.q_ht, name: "vraag HT [kW]", line: { color: K.ht, shape: "hv" }, xaxis: "x", yaxis: "y4" },
-    { x: t, y: d.q_lt, name: "vraag LT [kW]", line: { color: K.lt, shape: "hv" }, xaxis: "x", yaxis: "y4" },
-    { x: t, y: d.t_buiten, name: "T buiten [°C]", line: { color: K.temp, dash: "dot" }, xaxis: "x", yaxis: "y5" },
+    // 1 · warmte uit de HT-WP's: direct naar de kassen of in het buffer, tegen het maximale HT-vermogen
+    staaf(d.htwp_dir, "HT-WP's → kassen [kW]", "#9FB3A8", "y"),
+    staaf(d.laad, "HT-WP's → buffer [kW]", K.buffer, "y"),
+    // 2 · elektrisch vermogen, tegen de aansluiting
+    staaf(d.el_ht, "WP HT [kWe]", K.ht, "y2"),
+    staaf(d.el_lt, "WP LT [kWe]", K.lt, "y2"),
+    // 3–5 · buffer, vulling, vraag en buitentemperatuur
+    staaf(d.laad, "buffer laden [kW]", K.buffer, "y3"),
+    staaf(ontl, "buffer ontladen [kW]", "#AA1555", "y3"),
+    { x: t, y: d.soc.map((v) => v * 100), name: "buffervulling [%]", line: { color: K.soc, width: 3, shape: "hv" }, xaxis: "x", yaxis: "y4" },
+    { x: t, y: d.q_ht, name: "vraag HT [kW]", line: { color: K.ht, shape: "hv" }, xaxis: "x", yaxis: "y5" },
+    { x: t, y: d.q_lt, name: "vraag LT [kW]", line: { color: K.lt, shape: "hv" }, xaxis: "x", yaxis: "y5" },
+    { x: t, y: d.t_buiten, name: "T buiten [°C]", line: { color: K.temp, dash: "dot" }, xaxis: "x", yaxis: "y6" },
   ];
-  const p = panelen([0.27, 0.2, 0.15, 0.27], ["<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer laden (+) / ontladen (−)</b> [kW]",
-    "<b>Buffervulling</b> [%]", "<b>Warmtevraag</b> [kW] <b>en buitentemperatuur</b> [°C] · geel = ontlaadvenster"]);
+  if (S.htMax) sporen.push(grensSpoor(t, S.htMax, "#1A1A1A", `max. HT-warmte ${nl(S.htMax)} kW`, "y"));
+  if (S.grens) sporen.push(grensSpoor(t, S.grens, "#C00A35", undefined, "y2"));
+  const p = panelen([0.22, 0.17, 0.15, 0.11, 0.2], ["<b>Warmte uit de HT-warmtepompen</b> [kW] · naar kassen en naar buffer",
+    "<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer laden (+) / ontladen (−)</b> [kW]",
+    "<b>Buffervulling</b> [%]", "<b>Warmtevraag</b> [kW] <b>en buitentemperatuur</b> [°C] · geel = ontlaadvenster"], 0.085);
+  legendaPerPaneel(sporen, { y: 1, y2: 2, y3: 3, y4: 4, y5: 5, y6: 5 });
+  sporen.find((sp) => sp.yaxis === "y4").showlegend = false;   // buffervulling: één lijn, de titel zegt genoeg
   const ly = layoutBasis({
-    height: 860, barmode: "relative", bargap: 0.05, shapes: vensterVormen(t, vens), margin: { l: 60, r: 55, t: 30, b: 110 },
-    yaxis: { ...p.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...p.assen.yaxis2, zeroline: true, zerolinecolor: "#9A9A9A" },
-    yaxis3: { ...p.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, yaxis4: { ...p.assen.yaxis4, rangemode: "tozero" },
-    yaxis5: { overlaying: "y4", side: "right", showgrid: false, zeroline: false, ticksuffix: " °C" },
-    xaxis: { ...TIJDAS, anchor: "y4" }, legend: LEGENDA_ONDER, annotations: p.annotations,
+    height: 1120, showlegend: true, barmode: "relative", bargap: 0.05, shapes: vensterVormen(t, vens), margin: { l: 60, r: 55, t: 60, b: 50 },
+    yaxis: { ...p.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...p.assen.yaxis2, rangemode: "tozero" },
+    yaxis3: { ...p.assen.yaxis3, zeroline: true, zerolinecolor: "#9A9A9A" },
+    yaxis4: { ...p.assen.yaxis4, range: [0, 105], tickvals: [0, 50, 100] }, yaxis5: { ...p.assen.yaxis5, rangemode: "tozero" },
+    yaxis6: { overlaying: "y5", side: "right", showgrid: false, zeroline: false, ticksuffix: " °C" },
+    xaxis: { ...TIJDAS, anchor: "y5" }, ...p.legendes, annotations: p.annotations,
   });
   Plotly.react("dagplot", sporen, ly, PL);
 }
@@ -573,6 +613,10 @@ const KPI_RIJEN = [
   ["Energiekosten WP's [€]", (k) => k.kosten.inkoop_vast_eur, -1, 0],
   ["kW-max WP's in venster (Σ maanden) [€]", (k) => k.kosten.indicatie_kwmax_venster_eur, -1, 0],
   ["Warmtetekort [MWh]", (k) => k.warmte.tekort_mwh, -1, 1],
+  ["Aansluiting: grens WP's [kWe]", (k) => k.aansluiting.grens_kwe, 0, 0],
+  ["Aansluiting: uren overschreden", (k) => k.aansluiting.uren_boven, -1, 0],
+  ["Aansluiting: max. overschrijding [kWe]", (k) => k.aansluiting.max_overschrijding_kwe, -1, 0],
+  ["Aansluiting: energie boven grens [kWh]", (k) => k.aansluiting.kwh_boven, -1, 0],
 ];
 
 async function toonVergelijking() {
@@ -622,12 +666,18 @@ async function tekenVergelijkDag(runs, datum, dagen = 1) {
     sporen.push({ x: d.t_lokaal, y: d.buf_ht.map((v, j) => v + d.buf_lt[j] - d.laad[j]), name: naam + " · buffer", legendgroup: naam, showlegend: false, line: { color: kleur, width: 2, shape: "hv" }, yaxis: "y2" });
     sporen.push({ x: d.t_lokaal, y: d.soc.map((v) => v * 100), name: naam + " · vulling", legendgroup: naam, showlegend: false, line: { color: kleur, width: 2, dash: "dot" }, yaxis: "y3" });
   });
+  const grenzen = [...new Set(runs.map((r) => r.kpi.aansluiting?.grens_kwe).filter((g) => g))];
+  grenzen.forEach((g) => {
+    const i = runs.findIndex((r) => r.kpi.aansluiting?.grens_kwe === g);
+    sporen.push(grensSpoor(t, g, grenzen.length > 1 ? K.runs[i] : "#C00A35", `aansluiting ${nl(g)} kWe${grenzen.length > 1 ? ` (run ${i + 1})` : ""}`));
+  });
   const vp = panelen([0.36, 0.3, 0.24], ["<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer ontladen (+) / laden (−)</b> [kW]",
-    "<b>Buffervulling</b> [%] · lijn = run, geel = ontlaadvenster"]);
+    "<b>Buffervulling</b> [%] · geel = ontlaadvenster"], 0.11);
+  legendaPerPaneel(sporen, { y: 1, y2: 2, y3: 3 });   // runkleuren staan bij paneel 1; paneel 2 en 3 gebruiken dezelfde kleuren
   Plotly.react("vdag", sporen, layoutBasis({
-    height: 680, shapes: vensterVormen(t, vens), margin: { l: 60, r: 20, t: 30, b: 100 }, xaxis: { ...TIJDAS, anchor: "y3" },
+    height: 760, showlegend: true, shapes: vensterVormen(t, vens), margin: { l: 60, r: 20, t: 60, b: 50 }, xaxis: { ...TIJDAS, anchor: "y3" },
     yaxis: { ...vp.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...vp.assen.yaxis2, zeroline: true, zerolinecolor: "#9A9A9A" },
-    yaxis3: { ...vp.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, legend: LEGENDA_ONDER, annotations: vp.annotations,
+    yaxis3: { ...vp.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, ...vp.legendes, annotations: vp.annotations,
   }), PL);
 }
 

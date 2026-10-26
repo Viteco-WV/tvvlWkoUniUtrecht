@@ -13,6 +13,10 @@ warmtepompen:
     aantal: 1
     p_max_kw: 105
     p_min_kw: 53
+aansluiting:
+  kva: 200
+  cos_phi: 0.95
+  overig_kwe: 0
 cop:
   eta_carnot: 0.55
   t_verdamper_c: 6.0
@@ -79,7 +83,7 @@ congestie:
   alleen_werkdagen: true
   utc_offset_h: 1
 strategie:
-  naam: referentie
+  naam: congestie
   referentie:
     soc_doel: 1.0
   congestie:

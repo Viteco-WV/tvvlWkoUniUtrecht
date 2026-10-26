@@ -54,7 +54,7 @@ Zonder Docker start je de app met `uvicorn webapp.main:app --app-dir simulatie -
 | `data/warmte/condensorwarmte_zlt_2001.csv` | Condensorwarmte van de ZLT-koelmachine naar het LT-net |
 | `data/klimaat/klimaatdata_knmi_debilt_samengesteld.csv` | Benadering van het NEN 5060-energiejaar, samengesteld uit open KNMI-uurdata De Bilt (CC BY 4.0, KNMI) |
 | `data/prijzen/dayahead_nl_op_simulatiejaar.csv` | Day-ahead NL 2024/2025 (Bundesnetzagentur / SMARD via energy-charts.info, CC BY 4.0) |
-| `simulatie/scenarios/`, `simulatie/runs/` | Referentie en netcongestie met 100, 200 en 300 m³, doorgerekend met de data hierboven en voorbeeldtarieven |
+| `simulatie/scenarios/`, `simulatie/runs/` | Netcongestie met 100, 200 en 300 m³ (WP's uit in het venster), doorgerekend met de data hierboven en voorbeeldtarieven |
 
 Het logo en de favicon in `simulatie/webapp/static/img/` zijn beeldmerken van de Universiteit Utrecht. Ze vallen onder de merkregels van de UU en vallen niet onder een open licentie.
 

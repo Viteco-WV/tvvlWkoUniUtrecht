@@ -13,9 +13,13 @@ warmtepompen:
     aantal: 1
     p_max_kw: 105
     p_min_kw: 53
+aansluiting:
+  kva: 200
+  cos_phi: 0.95
+  overig_kwe: 0
 cop:
   eta_carnot: 0.55
-  t_verdamper_c: 6
+  t_verdamper_c: 6.0
   p_max_tov_nominaal: 1.28
   deellast:
   - - 0.14
@@ -39,14 +43,14 @@ temperatuur:
     - - 15
       - 35.0
 buffer:
-  volume_m3: 100
+  volume_m3: 300
   t_laad_c: 67
   t_retour_c: 35
   dt_wisselaar_k: 2
   p_max_kw: 880
   ua_kw_per_k: 0.07
   ua_referentie_m3: 200
-  soc_start: 1
+  soc_start: 1.0
 condensor_zlt: true
 tarieven:
   kwmax_eur_kw_maand: 5.2943
