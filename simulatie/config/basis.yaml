@@ -1,0 +1,67 @@
+# Basisconfiguratie simulatiemodel BoTu UU (DEOG Fase 5).
+# Statuslabels volgens de skill: [bron] document, [afgeleid] berekend, [aanname] projectkeuze.
+# Paden zijn relatief aan de projectmap.
+naam: basis
+
+data:
+  warmte_netten: data/warmte/warmtedata_netten_2001.csv       # [bron] JBDC per afdeling, HT/LT
+  klimaat: data/klimaat/klimaatdata_knmi_debilt_samengesteld.csv  # [afgeleid] KNMI-benadering NEN 5060 (open data)
+  condensor: data/warmte/condensorwarmte_zlt_2001.csv          # [afgeleid] Lab 3 koude x 1,277
+  prijzen: data/prijzen/dayahead_nl_op_simulatiejaar.csv       # [bron] day-ahead NL (scenario)
+
+warmtepompen:
+  ht: {aantal: 2, p_max_kw: 205, p_min_kw: 103}                # [bron] P&ID / BOD
+  lt: {aantal: 1, p_max_kw: 105, p_min_kw: 53}                 # [bron] P&ID / BOD
+
+cop:
+  eta_carnot: 0.55                                             # [afgeleid] Dutek-werkpunten; COP 4,5 bij 45 °C [aanname]
+  t_verdamper_c: 6.0                                           # [bron] BOD bron 16/6 °C
+  p_max_tov_nominaal: 1.28                                     # [afgeleid] Dutek max/nominaal
+  deellast: [[0.14, 1.018], [1.0, 1.0], [1.2, 0.97], [1.28, 0.948]]  # [afgeleid] PLR t.o.v. nominaal -> factor
+
+temperatuur:
+  modus: stooklijn                                             # stooklijn | vraaggestuurd
+  voorregeling_k: 3                                            # [aanname] aanvoer boven buistemperatuur (vraaggestuurd)
+  stooklijn:                                                   # [aanname] T_buiten -> T_aanvoer
+    ht: [[-10, 65], [15, 55]]
+    lt: [[-10, 45], [15, 35]]
+
+buffer:
+  volume_m3: 200                                               # [bron] P&ID
+  t_laad_c: 67                                                 # [bron] projectteam; HT-WP levert dan 69 °C
+  t_retour_c: 35                                               # [bron] BOD
+  dt_wisselaar_k: 2                                            # [bron] projectteam / P&ID
+  p_max_kw: 880                                                # [bron] BOD
+  ua_kw_per_k: 0.07                                            # [afgeleid] uit IF 3a-verlies, bovengronds
+  ua_referentie_m3: 200                                        # UA geldt voor dit volume; schaalt met V^(2/3)
+  soc_start: 1.0
+
+condensor_zlt: true                                            # [bron] BOD: condensorwarmte ZLT-koelmachine (Lab 3) naar LT-net; vast aan, niet in de webapp-invoer
+
+tarieven:                                                      # [voorbeeld] openbare waarden; vervang door eigen contractwaarden
+  kwmax_eur_kw_maand: 5.2943                                   # [bron] Stedin 2026, kW-max Trafo HS+TS/MS (openbaar tariefblad)
+  kwmax_stijging_pct_jaar: 0                                   # [voorbeeld]
+  inkoop_winter_eur_kwh: 0.087                                 # [voorbeeld] gem. day-ahead NL 2025
+  inkoop_zomer_eur_kwh: 0.087                                  # [voorbeeld] gem. day-ahead NL 2025
+  winter_maanden: [10, 11, 12, 1, 2, 3]
+  opslag_piek_eur_kwh: 0.0                                     # [voorbeeld]
+  opslag_dal_eur_kwh: 0.0                                      # [voorbeeld]
+  piekuren_lokaal: [7, 23]
+  energiebelasting_eur_kwh: 0.0                                # [voorbeeld] vul de eigen staffel in
+
+congestie:                                                     # [aanname] congestievenster werkdagen, winter
+  maanden: [11, 12, 1, 2, 3]
+  uren_lokaal: [8, 17]                                         # van 08:00 tot 17:00
+  alleen_werkdagen: true
+  utc_offset_h: 1                                              # NEN-jaar staat in UT; lokaal = UT+1
+
+strategie:
+  naam: referentie
+  referentie:
+    soc_doel: 1.0                                              # buffer vol houden (back-up), laden met HT-restcapaciteit
+    min_last_via_buffer: false                                 # vereenvoudigd (29-09-2026): WP's volgen de vraag, pendelen blijft KPI
+  congestie:
+    reductie_kwe: 100                                          # [aanname] gevraagde verlaging in het venster
+    alles_uit: false                                           # true = WP's volledig uit in het venster
+    adaptief: true                                             # verlaging per dag begrenzen tot wat in het buffer past
+    veiligheid: 0.95                                           # deel van de buffervulling dat mag worden ingezet

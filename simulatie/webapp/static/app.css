@@ -1,0 +1,126 @@
+/* Huisstijl Universiteit Utrecht: geel #FFCD00 dragend, zwart/wit, rood #C00A35 als accent.
+   Secundaire kleuren alleen in grafieken. */
+:root {
+  --uu-geel: #FFCD00;
+  --uu-zwart: #000000;
+  --uu-wit: #FFFFFF;
+  --uu-rood: #C00A35;
+  --uu-creme: #FFE6AB;
+  --uu-groen: #24A793;
+  --uu-blauw: #5287C6;
+  --uu-donkerblauw: #001240;
+  --uu-oranje: #F3965E;
+  --grijs-1: #F4F4F4;
+  --grijs-2: #E6E6E6;
+  --grijs-3: #9A9A9A;
+  --tekst: #1A1A1A;
+  --tekst-2: #555555;
+  --kop-font: "Merriweather", Georgia, serif;
+  --tekst-font: "Open Sans", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: var(--tekst-font); color: var(--tekst); background: var(--grijs-1); font-size: 15px; }
+h1, h2, h3 { font-family: var(--kop-font); color: var(--uu-zwart); margin: 0; }
+h2 { font-size: 24px; margin-bottom: 4px; }
+h3 { font-size: 17px; margin-bottom: 10px; }
+a { color: inherit; }
+
+/* kop */
+.kop { display: flex; align-items: stretch; background: var(--uu-wit); border-bottom: 1px solid var(--grijs-2); }
+.kop-merk { background: var(--uu-geel); display: flex; align-items: center; padding: 14px 26px; min-width: 250px; }
+.logo { height: 46px; }
+.woordmerk { font-family: var(--kop-font); font-weight: 900; font-size: 20px; letter-spacing: .2px; }
+.kop-titel { padding: 12px 28px; display: flex; flex-direction: column; justify-content: center; }
+.kop-project { font-size: 12px; color: var(--tekst-2); text-transform: uppercase; letter-spacing: .6px; }
+.kop-titel h1 { font-size: 21px; margin-top: 2px; }
+
+/* stappen */
+.stappen { display: flex; gap: 4px; background: var(--uu-zwart); padding: 0 20px; }
+.stappen a { color: var(--uu-wit); text-decoration: none; padding: 13px 20px; font-weight: 600; display: flex; align-items: center; gap: 10px; border-bottom: 4px solid transparent; }
+.stappen a .nr { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--uu-wit); display: inline-flex; align-items: center; justify-content: center; font-size: 12px; }
+.stappen a.actief { border-bottom-color: var(--uu-geel); }
+.stappen a.actief .nr { background: var(--uu-geel); border-color: var(--uu-geel); color: var(--uu-zwart); }
+.stappen a:hover { background: #1c1c1c; }
+
+.inhoud { max-width: 1480px; margin: 0 auto; padding: 24px 28px 40px; }
+.voet { text-align: center; font-size: 12px; color: var(--tekst-2); padding: 18px; }
+.sub { color: var(--tekst-2); margin: 0 0 18px; }
+
+/* blokken */
+.raster { display: grid; gap: 18px; }
+.twee { grid-template-columns: 340px 1fr; }
+.kaart { background: var(--uu-wit); border-radius: 6px; padding: 18px 20px; border: 1px solid var(--grijs-2); }
+.kaart.geel { border-top: 5px solid var(--uu-geel); }
+.rij { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.tussen { justify-content: space-between; }
+
+/* knoppen */
+.knop { font-family: var(--tekst-font); font-weight: 700; font-size: 14px; border-radius: 4px; padding: 10px 18px; cursor: pointer; border: 2px solid var(--uu-zwart); background: var(--uu-wit); color: var(--uu-zwart); }
+.knop.primair { background: var(--uu-geel); border-color: var(--uu-geel); }
+.knop.primair:hover { background: #ffd83a; }
+.knop.zwart { background: var(--uu-zwart); color: var(--uu-wit); }
+.knop.klein { padding: 5px 10px; font-size: 12px; border-width: 1px; }
+.knop.gevaar { border-color: var(--uu-rood); color: var(--uu-rood); }
+.knop:disabled { opacity: .45; cursor: not-allowed; }
+.groot { font-size: 17px; padding: 14px 30px; }
+
+/* scenariolijst */
+.lijst { display: flex; flex-direction: column; gap: 10px; }
+.item { border: 1px solid var(--grijs-2); border-radius: 6px; padding: 12px 14px; background: var(--uu-wit); cursor: pointer; }
+.item:hover { border-color: var(--uu-zwart); }
+.item.gekozen { border-color: var(--uu-zwart); box-shadow: inset 5px 0 0 var(--uu-geel); }
+.item .t { font-weight: 700; }
+.item .o { font-size: 13px; color: var(--tekst-2); margin-top: 2px; }
+.item .d { font-size: 11px; color: var(--grijs-3); margin-top: 6px; }
+
+/* formulier */
+.groepen { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 16px; }
+.scenariobalk { display: grid; grid-template-columns: 1.2fr 1fr 2fr; gap: 14px; align-items: end; }
+.scenariobalk label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; }
+.veld.geavanceerd label { color: var(--tekst-2); }
+.invoer-eenheid select { font-family: var(--tekst-font); font-size: 14px; padding: 7px 6px; border: 1px solid var(--grijs-3); border-radius: 4px; background: var(--uu-wit); }
+.veld > select { font-family: var(--tekst-font); font-size: 14px; }
+.veld { display: grid; grid-template-columns: 1fr 190px; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--grijs-1); }
+.veld label { font-size: 14px; }
+.veld .hulp { display: block; font-size: 11px; color: var(--tekst-2); }
+.veld input[type=number], .veld select, .tekstveld { font-family: var(--tekst-font); font-size: 14px; padding: 7px 8px; border: 1px solid var(--grijs-3); border-radius: 4px; width: 100%; background: var(--uu-wit); }
+.veld input:focus, .veld select:focus, .tekstveld:focus { outline: 3px solid var(--uu-geel); border-color: var(--uu-zwart); }
+.eenheid { font-size: 12px; color: var(--tekst-2); }
+.invoer-eenheid { display: flex; gap: 6px; align-items: center; }
+.status { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
+.status.bron { background: var(--uu-zwart); color: var(--uu-wit); }
+.status.afgeleid { background: var(--grijs-2); color: var(--uu-zwart); }
+.status.aanname { background: var(--uu-creme); color: var(--uu-zwart); }
+.maanden { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; grid-column: 1 / -1; }
+.chip { border: 1px solid var(--grijs-3); border-radius: 14px; padding: 4px 10px; font-size: 12px; text-align: center; cursor: pointer; user-select: none; background: var(--uu-wit); }
+.chip.aan { background: var(--uu-geel); border-color: var(--uu-geel); font-weight: 700; }
+.schakel { width: 44px; height: 24px; accent-color: var(--uu-zwart); }
+.afgeleid-info { background: var(--uu-creme); border-radius: 4px; padding: 8px 12px; font-size: 13px; margin-top: 10px; }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.kpi { background: var(--uu-wit); border: 1px solid var(--grijs-2); border-radius: 6px; padding: 14px 16px; border-left: 5px solid var(--uu-geel); }
+.kpi .w { font-family: var(--kop-font); font-size: 24px; font-weight: 900; }
+.kpi .l { font-size: 12px; color: var(--tekst-2); margin-top: 2px; }
+
+/* tabellen */
+table.tab { border-collapse: collapse; width: 100%; font-size: 13px; }
+.tab th { background: var(--uu-zwart); color: var(--uu-wit); text-align: left; padding: 8px 10px; font-weight: 600; }
+.tab td { padding: 7px 10px; border-bottom: 1px solid var(--grijs-2); }
+.tab td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tab tr:hover td { background: #fffbea; }
+.beter { color: #0f7a68; font-weight: 700; }
+.slechter { color: var(--uu-rood); font-weight: 700; }
+
+.dagkeuze { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.dagkeuze .chip { padding: 7px 12px; font-size: 13px; }
+.dagkeuze .chip small { display: block; font-size: 10px; color: var(--tekst-2); font-weight: 400; }
+.grafiek { width: 100%; }
+.melding { padding: 12px 16px; border-radius: 4px; background: var(--uu-creme); margin: 10px 0; }
+.melding.fout { background: #fde8ec; color: var(--uu-rood); white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+.spinner { width: 18px; height: 18px; border: 3px solid var(--grijs-2); border-top-color: var(--uu-zwart); border-radius: 50%; animation: draai 0.8s linear infinite; display: inline-block; }
+@keyframes draai { to { transform: rotate(360deg); } }
+.leeg { color: var(--tekst-2); padding: 30px; text-align: center; }
+.sectie { margin-top: 26px; }
+.runlijst { max-height: 260px; overflow: auto; }
+@media (max-width: 1000px) { .twee { grid-template-columns: 1fr; } .groepen { grid-template-columns: 1fr; } .scenariobalk { grid-template-columns: 1fr; } }

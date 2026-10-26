@@ -1,21 +1,9 @@
-.DS_Store
-__pycache__/
-*.py[cod]
 .venv/
-venv/
-
-# Local Streamlit credentials. Keep real passwords out of the public repo.
-.streamlit/secrets.toml
-
-# Workspace/runtime files that are not part of the app.
-.openclaw/
-logs/
-memory/
-*_extracted.txt
-AGENTS.md
-HEARTBEAT.md
-IDENTITY.md
-MEMORY.md
-SOUL.md
-TOOLS.md
-USER.md
+__pycache__/
+*.pyc
+.DS_Store
+simulatie/runs/
+simulatie/resultaten/
+simulatie/scenarios/*
+!simulatie/scenarios/*.yaml
+.pytest_cache/
