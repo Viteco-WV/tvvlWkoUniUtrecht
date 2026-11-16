@@ -1,0 +1,47 @@
+id: b04-begrensd-ht-2-205-kw-207-kva-200-m-1
+naam: B04 · begrensd · HT 2×205 kW · 207 kVA · 200 m³ · 100 %
+omschrijving: Als F05, maar begrensd op de aansluiting (207 kVA, overige gebruikers
+  0 kWe)
+aangemaakt: '2026-11-16T20:48:19'
+gewijzigd: '2026-11-16T20:48:19'
+waarden:
+  strategie.naam: congestie
+  congestie.uren_lokaal:
+  - 9
+  - 16
+  congestie.maanden:
+  - 1
+  - 2
+  - 12
+  congestie.alleen_werkdagen: true
+  strategie.congestie.verlaging_pct: 100.0
+  strategie.congestie.adaptief: true
+  buffer.volume_m3: 200.0
+  buffer.t_laad_c: 70.0
+  buffer.t_retour_c: 45
+  buffer.p_max_kw: 880
+  buffer.dt_wisselaar_k: 2
+  buffer.ua_kw_per_k: 0.07
+  buffer.soc_start: 1
+  warmtepompen.ht.aantal: 2
+  warmtepompen.ht.p_max_kw: 205.0
+  warmtepompen.ht.p_min_kw: 51.0
+  warmtepompen.lt.aantal: 1
+  warmtepompen.lt.p_max_kw: 105
+  warmtepompen.lt.p_min_kw: 26
+  cop.eta_carnot: 0.5
+  cop.t_verdamper_c: 6
+  aansluiting.kva: 207
+  aansluiting.begrenzen: true
+  aansluiting.cos_phi: 0.95
+  aansluiting.overig_kwe: 0
+  stooklijn.ht.m10: 65
+  stooklijn.ht.p15: 55
+  stooklijn.lt.m10: 45
+  stooklijn.lt.p15: 35
+  tarieven.kwmax_eur_kw_maand: 5.2943
+  tarieven.inkoop_winter_eur_kwh: 0.087
+  tarieven.inkoop_zomer_eur_kwh: 0.087
+  tarieven.opslag_piek_eur_kwh: 0.0
+  tarieven.opslag_dal_eur_kwh: 0.0
+  tarieven.energiebelasting_eur_kwh: 0.0
