@@ -1,5 +1,5 @@
 {
- "id": "20261116-163901-netcongestie-300-m",
+ "id": "20261116-212834-netcongestie-300-m",
  "scenario_id": "netcongestie-300-m",
  "scenario_naam": "Netcongestie 300 m³",
  "omschrijving": "WP's 100 % uit in het venster (werkdagen 08–17 h, nov–mrt, adaptief), buffer 300 m³",
@@ -48,7 +48,7 @@
   "tarieven.opslag_dal_eur_kwh": 0.0,
   "tarieven.energiebelasting_eur_kwh": 0.0
  },
- "gestart": "2026-11-16T16:39:01",
+ "gestart": "2026-11-16T21:28:34",
  "status": "klaar",
- "duur_s": 2.3
+ "duur_s": 2.2
 }

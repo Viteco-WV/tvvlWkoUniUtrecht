@@ -315,8 +315,8 @@ function kpiKaarten(k, wc, w, mx) {
       `<b>Wat:</b> het hoogste elektrische vermogen van de warmtepompen samen in het hele jaar, binnen én buiten het ontlaadvenster.
        ${a ? `<b>Aansluiting:</b> grens voor de WP's ${nl(a.grens_kwe)} kWe (${nl(a.kva)} kVA × cos φ − overige gebruikers).
        ${a.begrenzen
-         ? `<b>Begrensd:</b> de WP's zijn elk uur onder de grens gehouden (eerst minder bijladen, dan buffer, anders warmtetekort). Dat greep in in <b>${nl(a.uren_begrensd)} uur</b>.`
-         : `${a.uren_boven ? `Overschreden in <b>${nl(a.uren_boven)} uur</b>, met maximaal ${nl(a.max_overschrijding_kwe)} kWe en ${nl(a.kwh_boven)} kWh boven de grens.` : "Nergens overschreden."}
+         ? `<b>Begrensd:</b> de WP's zijn elk uur onder de grens gehouden (eerst minder bijladen, dan buffer, anders warmtetekort). Dat greep in in <strong>${nl(a.uren_begrensd)} uur</strong>.`
+         : `${a.uren_boven ? `Overschreden in <strong>${nl(a.uren_boven)} uur</strong>, met maximaal ${nl(a.max_overschrijding_kwe)} kWe en ${nl(a.kwh_boven)} kWh boven de grens.` : "Nergens overschreden."}
        Zonder het vinkje "begrenzen" wordt dit alleen gemeld; de WP's worden niet afgeremd.`}` : ""}
        ${mx ? `<b>Max. tussen haakjes:</b> wat de WP's samen maximaal kunnen vragen: alle WP's op hun maximale thermische vermogen bij de slechtste COP.
        <div class="formule">HT ${nl(w["warmtepompen.ht.aantal"])} × ${nl(w["warmtepompen.ht.p_max_kw"])} kW bij ${nl(mx.ht.t_c)} °C, COP ${nl(mx.ht.cop, 2)} → ${nl(mx.ht.kwe)} kWe<br>
@@ -678,8 +678,15 @@ async function tekenVergelijkDag(runs, datum, dagen = 1) {
   const vp = panelen([0.36, 0.3, 0.24], ["<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer ontladen (+) / laden (−)</b> [kW]",
     "<b>Buffervulling</b> [%] · geel = ontlaadvenster"], 0.11);
   legendaPerPaneel(sporen, { y: 1, y2: 2, y3: 3 });   // runkleuren staan bij paneel 1; paneel 2 en 3 gebruiken dezelfde kleuren
+  // lange scenarionamen: de legenda van paneel 1 loopt over meerdere regels; titel en bovenmarge schuiven mee omhoog
+  const breed = ($("#vdag").clientWidth || 900) - 80;
+  const items = sporen.filter((sp) => sp.yaxis === "y" && sp.showlegend !== false).map((sp) => sp.name.length * 6.6 + 40);
+  let regels = 1, rest = breed;
+  items.forEach((w) => { if (w > rest && rest < breed) { regels += 1; rest = breed; } rest -= w; });
+  const extra = (regels - 1) * 19;
+  vp.annotations[0].yshift += extra;
   Plotly.react("vdag", sporen, layoutBasis({
-    height: 760, showlegend: true, shapes: vensterVormen(t, vens), margin: { l: 60, r: 20, t: 60, b: 50 }, xaxis: { ...TIJDAS, anchor: "y3" },
+    height: 760 + extra, showlegend: true, shapes: vensterVormen(t, vens), margin: { l: 60, r: 20, t: 60 + extra, b: 50 }, xaxis: { ...TIJDAS, anchor: "y3" },
     yaxis: { ...vp.assen.yaxis, rangemode: "tozero" }, yaxis2: { ...vp.assen.yaxis2, zeroline: true, zerolinecolor: "#9A9A9A" },
     yaxis3: { ...vp.assen.yaxis3, range: [0, 105], tickvals: [0, 50, 100] }, ...vp.legendes, annotations: vp.annotations,
   }), PL);
