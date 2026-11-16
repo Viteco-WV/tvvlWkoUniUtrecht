@@ -17,6 +17,7 @@ aansluiting:                                                   # elektrische aan
   kva: 200                                                     # [bron] kabel 200 kVA = afgezekerde waarde (projectteam); trafo 1.000 kVA
   cos_phi: 0.95                                                # [aanname] arbeidsfactor -> 190 kWe
   overig_kwe: 0                                                # [aanname] vermogen gereserveerd voor overige gebruikers op dezelfde kabel
+  begrenzen: false                                             # [aanname] true = WP's elk uur onder de grens houden (anders alleen melden)
 
 cop:
   eta_carnot: 0.55                                             # [afgeleid] Dutek-werkpunten; COP 4,5 bij 45 °C [aanname]

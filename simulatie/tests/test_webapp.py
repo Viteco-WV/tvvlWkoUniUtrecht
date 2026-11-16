@@ -109,13 +109,16 @@ def test_rapport_vraagt_twee_tot_vier_runs(client):
     assert client.get("/api/rapport?runs=a,b").status_code == 404
 
 
-def test_verlaging_in_procenten(tmp_path):
-    """50 % verlaging met een ruim buffer: het WP-vermogen in het venster halveert ongeveer."""
-    ref = _draai(tmp_path / "ref", "Referentie", {"strategie.naam": "referentie"})
+def test_reductie_is_plafond(tmp_path):
+    """Reductie 50 % met een ruim buffer: het WP-vermogen in het venster blijft onder (100 % − 50 %) × max. vermogen,
+    maar rustige uren worden niet verlaagd (plafond, geen evenredige verlaging)."""
     half = _draai(tmp_path / "half", "50 %", {"strategie.naam": "congestie", "strategie.congestie.verlaging_pct": 50,
                                                "buffer.volume_m3": 300})
-    g_ref, g_half = (r["kpi"]["elektra"]["gem_kwe_congestievenster"] for r in (ref, half))
-    assert 0.4 < g_half / g_ref < 0.6
+    plafond = 0.5 * max_vermogen(half["cfg"])["totaal_kwe"]
+    vens = half["u"]["congestievenster"].astype(str).eq("True")
+    assert half["u"].loc[vens, "el"].max() <= plafond + 0.5
+    rustig = vens & (half["u"]["el"] < plafond - 1)                              # uren ruim onder het plafond
+    assert (half["u"].loc[rustig, "buf_ht"] + half["u"].loc[rustig, "buf_lt"]).max() < 0.01   # daar levert het buffer niets
     assert half["kpi"]["warmte"]["tekort_mwh"] == 0
 
 
@@ -129,3 +132,16 @@ def test_aansluiting_overschrijding(runs, tmp_path):
     assert g["uren_boven"] > 0 and 0 < g["max_overschrijding_kwe"] < 20 and g["kwh_boven"] > 0
     boven = groot["u"][groot["u"]["el"] > g["grens_kwe"]]
     assert not boven["congestievenster"].astype(str).eq("True").any()          # overschrijding buiten het venster (bijladen)
+
+
+def test_begrenzen_op_aansluiting(tmp_path):
+    """Met het vinkje blijft het WP-vermogen elk uur onder de grens; een te krappe aansluiting geeft een warmtetekort."""
+    w = {"strategie.naam": "congestie", "strategie.congestie.verlaging_pct": 100, "aansluiting.begrenzen": True}
+    groot = _draai(tmp_path / "groot", "HT 2×250 begrensd", {**w, "warmtepompen.ht.p_max_kw": 250})
+    a = groot["kpi"]["aansluiting"]
+    assert groot["u"]["el"].max() <= a["grens_kwe"] + 0.01 and a["uren_boven"] == 0 and a["uren_begrensd"] > 0
+    assert groot["kpi"]["warmte"]["tekort_mwh"] == 0                              # alleen het bijladen is ingeperkt
+    krap = _draai(tmp_path / "krap", "100 kVA begrensd", {**w, "aansluiting.kva": 100})
+    assert krap["u"]["el"].max() <= krap["kpi"]["aansluiting"]["grens_kwe"] + 0.01
+    assert krap["kpi"]["warmte"]["tekort_mwh"] > 0                               # 95 kWe is te weinig voor de winter
+

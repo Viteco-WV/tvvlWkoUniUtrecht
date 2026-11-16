@@ -33,54 +33,80 @@ class Referentie(Regelaar):
 
 
 def verlaging_fractie(c):
-    """Gevraagde verlaging als fractie (0–1) uit strategie.congestie; oude configuraties met `alles_uit` blijven werken."""
+    """Gevraagde reductie als fractie (0–1) uit strategie.congestie; oude configuraties met `alles_uit` blijven werken."""
     if "verlaging_pct" in c:
         return min(1.0, max(0.0, float(c["verlaging_pct"]) / 100))
     return 1.0   # oude configuraties (alles_uit / reductie_kwe): als volledig uit behandelen
 
 
 class Congestie(Referentie):
-    """Strategie 3. In het congestievenster draaien de WP's een percentage minder hard dan zonder verlaging
-    (100 % = uit); het buffer levert de warmte die dan ontbreekt, voor HT en LT naar verhouding. Buiten het venster
-    gedraagt de regelaar zich als de referentie en laadt het buffer weer vol.
+    """Strategie 3. In het congestievenster geldt een plafond voor het elektrisch vermogen van de WP's samen:
+    (100 % − reductie) × hun maximale vermogen (100 % = uit). Vragen de kassen meer dan de WP's onder het plafond
+    kunnen leveren, dan levert het buffer de rest (HT en LT naar verhouding); daaronder draaien de WP's gewoon.
+    Buiten het venster gedraagt de regelaar zich als de referentie en laadt het buffer weer vol.
 
-    Adaptief (perfecte voorspelling van de vensterdag): past de gevraagde verlaging bij de start van het venster
-    niet in de buffervulling, dan wordt het percentage voor die dag verlaagd tot het past. Zo wordt een kleinere,
-    maar zekere verlaging over het hele venster gehaald in plaats van een volledige verlaging die halverwege stopt.
+    Adaptief (perfecte voorspelling van de vensterdag): past de buffervraag van de hele dag bij de start van het venster
+    niet in de buffervulling, dan wordt het plafond voor die dag verhoogd tot het past. Zo wordt een kleinere,
+    maar zekere reductie over het hele venster gehaald in plaats van een volledige reductie die halverwege stopt.
     """
     label = "3 · Netcongestie"
-    beschrijving = "Verlaagt het WP-vermogen in het congestievenster met een percentage; buffer levert, laadt buiten het venster bij."
+    beschrijving = "Begrenst het WP-vermogen in het congestievenster tot een plafond; buffer levert de rest, laadt buiten het venster bij."
     naam = "congestie"
 
     def start(self, cfg, df, buffer):
         super().start(cfg, df, buffer)
+        from .componenten import elektra
+        from .kpi import max_vermogen
         c = cfg["strategie"].get("congestie", {})
         self.f = verlaging_fractie(c)
         self.adaptief = c.get("adaptief", True)
         self.veilig = c.get("veiligheid", 0.95)
+        self.p_max = max_vermogen(cfg)["totaal_kwe"]
         self.q_ht = df["q_ht"].values
         self.q_lt = (df["q_lt"] - df[["q_cond", "q_lt"]].min(axis=1)).values   # LT-vraag na condensorwarmte
         self.vens = df["congestievenster"].values.astype(bool)
-        self.f_dag = self.f
+        ht, lt, cc = cfg["warmtepompen"]["ht"], cfg["warmtepompen"]["lt"], cfg["cop"]
+        t_ht, t_lt = df["t_aanvoer_ht"].values, df["t_aanvoer_lt"].values
+        # elektrisch vermogen van de WP's als een deel g van de warmtevraag uit het buffer komt (direct leveren, niet laden)
+        self._el = lambda i, g: (elektra((1 - g) * self.q_ht[i], t_ht[i], ht, cc)[0]
+                                 + elektra((1 - g) * self.q_lt[i], t_lt[i], lt, cc)[0])
+        self.plafond = (1 - self.f) * self.p_max
+        self.uren = []
 
-    def _vensterwarmte(self, i, f):
-        tot, j = 0.0, i
-        while j < len(self.vens) and self.vens[j]:
-            tot += f * (self.q_ht[j] + self.q_lt[j])
-            j += 1
-        return tot
+    def _buffer_deel(self, i, plafond):
+        """Deel (0–1) van de warmtevraag in uur i dat uit het buffer moet komen om onder het plafond te blijven."""
+        if plafond <= 0:
+            return 1.0
+        if self._el(i, 0.0) <= plafond:
+            return 0.0
+        lo, hi = 0.0, 1.0
+        for _ in range(25):
+            mid = (lo + hi) / 2
+            lo, hi = (mid, hi) if self._el(i, mid) > plafond else (lo, mid)
+        return hi
+
+    def _vensterwarmte(self, plafond):
+        return sum(self._buffer_deel(j, plafond) * (self.q_ht[j] + self.q_lt[j]) for j in self.uren)
 
     def besluit(self, i, r, buf):
         if not self.vens[i]:
             return super().besluit(i, r, buf)
-        if i == 0 or not self.vens[i - 1]:
-            self.f_dag = self.f
+        if i == 0 or not self.vens[i - 1]:   # start van een venster: uren en plafond voor deze dag bepalen
+            j, self.uren = i, []
+            while j < len(self.vens) and self.vens[j]:
+                self.uren.append(j)
+                j += 1
+            self.plafond = (1 - self.f) * self.p_max
             if self.adaptief:
                 beschikbaar = self.veilig * buf.e
-                nodig = self._vensterwarmte(i, 1.0)
-                if self.f * nodig > beschikbaar:
-                    self.f_dag = beschikbaar / nodig if nodig > 0 else self.f   # lineair in f: direct op te lossen
-        return {"buf_ht": self.f_dag * self.q_ht[i], "buf_lt": self.f_dag * self.q_lt[i], "laad": 0.0}
+                if self._vensterwarmte(self.plafond) > beschikbaar:
+                    lo, hi = self.plafond, self.p_max   # hoger plafond = minder uit het buffer
+                    for _ in range(20):
+                        mid = (lo + hi) / 2
+                        lo, hi = (mid, hi) if self._vensterwarmte(mid) > beschikbaar else (lo, mid)
+                    self.plafond = hi
+        g = self._buffer_deel(i, self.plafond)
+        return {"buf_ht": g * self.q_ht[i], "buf_lt": g * self.q_lt[i], "laad": 0.0}
 
 
 STRATEGIEEN = {"referentie": Referentie, "congestie": Congestie}

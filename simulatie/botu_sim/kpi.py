@@ -7,17 +7,19 @@ def _mwh(x):
     return round(float(x.sum()) / 1000, 1)
 
 
-AANSLUITING_STANDAARD = {"kva": 200, "cos_phi": 0.95, "overig_kwe": 0}
+AANSLUITING_STANDAARD = {"kva": 200, "cos_phi": 0.95, "overig_kwe": 0, "begrenzen": False}
 
 
-def aansluiting(el, c=None):
+def aansluiting(el, c=None, begrensd=None):
     """Elektrische aansluiting: grens voor de WP's (kVA · cos φ − overige gebruikers) en hoe vaak en hoeveel het
-    WP-vermogen die overschrijdt (uurwaarden). Alleen gerapporteerd; het model begrenst de WP's niet."""
+    WP-vermogen die overschrijdt (uurwaarden). Met `begrenzen` houdt de simulatie de WP's onder de grens;
+    `uren_begrensd` telt de uren waarin dat ingreep."""
     c = {**AANSLUITING_STANDAARD, **(c or {})}
     grens = c["kva"] * c["cos_phi"] - c["overig_kwe"]
     boven = np.clip(np.asarray(el, dtype=float) - grens, 0, None)
     return {"kva": c["kva"], "grens_kwe": round(grens, 1), "uren_boven": int((boven > 0.05).sum()),
-            "max_overschrijding_kwe": round(float(boven.max()), 1), "kwh_boven": round(float(boven.sum()))}
+            "max_overschrijding_kwe": round(float(boven.max()), 1), "kwh_boven": round(float(boven.sum())),
+            "begrenzen": bool(c["begrenzen"]), "uren_begrensd": int(np.asarray(begrensd).sum()) if begrensd is not None else 0}
 
 
 def bereken(res, cfg):
@@ -39,7 +41,7 @@ def bereken(res, cfg):
     pendel = lambda d: int(((d > 0) & (d < 1)).sum())
 
     return {
-        "aansluiting": aansluiting(el, cfg.get("aansluiting")),
+        "aansluiting": aansluiting(el, cfg.get("aansluiting"), res["begrensd"] if "begrensd" in res else None),
         "warmte": {
             "vraag_ht_mwh": _mwh(res["q_ht"]), "vraag_lt_mwh": _mwh(res["q_lt"]),
             "ht_wp_mwh": _mwh(res["q_htwp"]), "ht_wp_direct_mwh": _mwh(res["htwp_dir"]), "lt_wp_mwh": _mwh(res["ltwp"]),

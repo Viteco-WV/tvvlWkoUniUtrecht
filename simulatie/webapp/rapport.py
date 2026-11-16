@@ -113,7 +113,7 @@ def strategie_tekst(w):
     if w.get("strategie.naam") == "congestie":
         pct = w.get("strategie.congestie.verlaging_pct")
         if pct is not None:
-            s = "WP's uit in het venster" if pct >= 100 else f"WP's {nl(pct)} % minder vermogen in het venster"
+            s = "WP's uit in het venster" if pct >= 100 else f"reductie {nl(pct)} %: WP-vermogen in het venster begrensd"
         else:   # oude runs
             s = "WP's uit in het venster" if w.get("strategie.congestie.alles_uit") else f"{nl(w.get('strategie.congestie.reductie_kwe'))} kWe verlagen in het venster"
         return s + (" (adaptief)" if w.get("strategie.congestie.adaptief") else "")
@@ -258,6 +258,7 @@ KPI = [  # label, functie(run) → waarde, richting (−1 = lager is beter), dec
     ("Aansluiting: uren overschreden", lambda r: r["kpi"]["aansluiting"]["uren_boven"], -1, 0, "h"),
     ("Aansluiting: max. overschrijding", lambda r: r["kpi"]["aansluiting"]["max_overschrijding_kwe"], -1, 0, "kWe"),
     ("Aansluiting: energie boven grens", lambda r: r["kpi"]["aansluiting"]["kwh_boven"], -1, 0, "kWh"),
+    ("Aansluiting: uren begrensd", lambda r: r["kpi"]["aansluiting"].get("uren_begrensd", 0), -1, 0, "h"),
 ]
 
 
@@ -462,8 +463,9 @@ def maak_rapport(mappen):
          "de volledige vraag dekt."),
         ("Kosten", "Energiekosten met het tarief uit het scenario; kW-max is een indicatie op basis van de maandpieken in het venster."),
         ("Warmtetekort", "Warmte die in een uur niet geleverd kan worden: de vraag is groter dan WP's plus buffer."),
-        ("Aansluiting", "Grens voor de WP's = aansluitvermogen (kVA) × cos φ − vermogen voor overige gebruikers. Gerapporteerd wordt hoe vaak "
-         "en hoeveel het WP-vermogen (uurwaarden) erboven komt; het model begrenst de WP's niet."),
+        ("Aansluiting", "Grens voor de WP's = aansluitvermogen (kVA) × cos φ − vermogen voor overige gebruikers. Zonder 'begrenzen' wordt gemeld "
+         "hoe vaak en hoeveel het WP-vermogen (uurwaarden) erboven komt. Met 'begrenzen' houdt het model de WP's elk uur onder de grens "
+         "(eerst minder bijladen, dan levert het buffer bij, anders warmtetekort); 'uren begrensd' telt hoe vaak dat ingreep."),
     ]
     verhaal += [CondPageBreak(70 * mm), P("Toelichting op de kerncijfers", "h2")]
     verhaal += [Paragraph(f"<b>{a}.</b> {b}", ST["bullet"], bulletText="•") for a, b in uitleg]

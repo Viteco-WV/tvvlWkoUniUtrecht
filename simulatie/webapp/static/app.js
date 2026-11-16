@@ -314,8 +314,10 @@ function kpiKaarten(k, wc, w, mx) {
         + (a && a.uren_boven ? ` · <span class="slechter">${nl(a.uren_boven)} h erboven</span>` : ""),
       `<b>Wat:</b> het hoogste elektrische vermogen van de warmtepompen samen in het hele jaar, binnen én buiten het ontlaadvenster.
        ${a ? `<b>Aansluiting:</b> grens voor de WP's ${nl(a.grens_kwe)} kWe (${nl(a.kva)} kVA × cos φ − overige gebruikers).
-       ${a.uren_boven ? `Overschreden in <b>${nl(a.uren_boven)} uur</b>, met maximaal ${nl(a.max_overschrijding_kwe)} kWe en ${nl(a.kwh_boven)} kWh boven de grens.` : "Nergens overschreden."}
-       Het model begrenst de WP's niet; dit laat zien wat de gekozen instellingen van de aansluiting vragen.` : ""}
+       ${a.begrenzen
+         ? `<b>Begrensd:</b> de WP's zijn elk uur onder de grens gehouden (eerst minder bijladen, dan buffer, anders warmtetekort). Dat greep in in <b>${nl(a.uren_begrensd)} uur</b>.`
+         : `${a.uren_boven ? `Overschreden in <b>${nl(a.uren_boven)} uur</b>, met maximaal ${nl(a.max_overschrijding_kwe)} kWe en ${nl(a.kwh_boven)} kWh boven de grens.` : "Nergens overschreden."}
+       Zonder het vinkje "begrenzen" wordt dit alleen gemeld; de WP's worden niet afgeremd.`}` : ""}
        ${mx ? `<b>Max. tussen haakjes:</b> wat de WP's samen maximaal kunnen vragen: alle WP's op hun maximale thermische vermogen bij de slechtste COP.
        <div class="formule">HT ${nl(w["warmtepompen.ht.aantal"])} × ${nl(w["warmtepompen.ht.p_max_kw"])} kW bij ${nl(mx.ht.t_c)} °C, COP ${nl(mx.ht.cop, 2)} → ${nl(mx.ht.kwe)} kWe<br>
        LT ${nl(w["warmtepompen.lt.aantal"])} × ${nl(w["warmtepompen.lt.p_max_kw"])} kW bij ${nl(mx.lt.t_c)} °C, COP ${nl(mx.lt.cop, 2)} → ${nl(mx.lt.kwe)} kWe</div>
@@ -351,10 +353,10 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") sluitUitleg(); });
 
-// verlaging in het venster; oude runs hadden "volledig uit" of een verlaging in kWe
+// reductie in het venster (plafond); oude runs hadden "volledig uit" of een verlaging in kWe
 function verlagingTekst(w) {
   const pct = w["strategie.congestie.verlaging_pct"];
-  if (pct !== undefined) return pct >= 100 ? "WP's uit" : `${nl(pct)} % minder vermogen`;
+  if (pct !== undefined) return pct >= 100 ? "WP's uit" : `reductie ${nl(pct)} % (plafond)`;
   return w["strategie.congestie.alles_uit"] ? "WP's uit" : `${nl(w["strategie.congestie.reductie_kwe"])} kWe verlaging`;
 }
 
@@ -362,6 +364,7 @@ async function toonRun(r) {
   const doel = $("#resultaat");
   const w = r.waarden;
   S.grens = r.kpi.aansluiting?.grens_kwe;
+  S.grensNaam = r.kpi.aansluiting?.begrenzen ? `aansluiting ${nl(S.grens)} kWe (begrensd)` : undefined;
   S.htMax = (w["warmtepompen.ht.aantal"] || 0) * (w["warmtepompen.ht.p_max_kw"] || 0);   // maximaal warmtevermogen HT-WP's
   const strategie = w["strategie.naam"] === "congestie"
     ? `Netcongestie · ${verlagingTekst(w)}${w["strategie.congestie.adaptief"] ? " (adaptief)" : ""}`
@@ -475,7 +478,7 @@ async function tekenDag(rid) {
     { x: t, y: d.t_buiten, name: "T buiten [°C]", line: { color: K.temp, dash: "dot" }, xaxis: "x", yaxis: "y6" },
   ];
   if (S.htMax) sporen.push(grensSpoor(t, S.htMax, "#1A1A1A", `max. HT-warmte ${nl(S.htMax)} kW`, "y"));
-  if (S.grens) sporen.push(grensSpoor(t, S.grens, "#C00A35", undefined, "y2"));
+  if (S.grens) sporen.push(grensSpoor(t, S.grens, "#C00A35", S.grensNaam, "y2"));
   const p = panelen([0.22, 0.17, 0.15, 0.11, 0.2], ["<b>Warmte uit de HT-warmtepompen</b> [kW] · naar kassen en naar buffer",
     "<b>Elektrisch vermogen warmtepompen</b> [kWe]", "<b>Buffer laden (+) / ontladen (−)</b> [kW]",
     "<b>Buffervulling</b> [%]", "<b>Warmtevraag</b> [kW] <b>en buitentemperatuur</b> [°C] · geel = ontlaadvenster"], 0.085);
@@ -617,6 +620,7 @@ const KPI_RIJEN = [
   ["Aansluiting: uren overschreden", (k) => k.aansluiting.uren_boven, -1, 0],
   ["Aansluiting: max. overschrijding [kWe]", (k) => k.aansluiting.max_overschrijding_kwe, -1, 0],
   ["Aansluiting: energie boven grens [kWh]", (k) => k.aansluiting.kwh_boven, -1, 0],
+  ["Aansluiting: uren begrensd", (k) => k.aansluiting.uren_begrensd ?? 0, -1, 0],
 ];
 
 async function toonVergelijking() {

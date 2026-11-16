@@ -13,8 +13,8 @@ GROEPEN = [
         {"k": "congestie.uren_lokaal", "label": "Ontlaadvenster", "type": "uren", "status": "afgeleid", "hulp": "Uren (lokale tijd) waarin het buffer de WP's vervangt."},
         {"k": "congestie.maanden", "label": "Periode", "type": "maandbereik", "status": "afgeleid"},
         {"k": "congestie.alleen_werkdagen", "label": "Alleen werkdagen", "type": "bool", "status": "afgeleid"},
-        {"k": "strategie.congestie.verlaging_pct", "label": "Verlaging in het venster", "eenheid": "%", "type": "number", "min": 0, "max": 100, "step": 5, "status": "aanname", "alleen": "congestie",
-         "hulp": "Percentage van het vermogen dat de WP's zonder verlaging zouden vragen. 100 % = volledig uit, 50 % = half zo hard."},
+        {"k": "strategie.congestie.verlaging_pct", "label": "Reductie in het venster", "eenheid": "%", "type": "number", "min": 0, "max": 100, "step": 5, "status": "aanname", "alleen": "congestie",
+         "hulp": "Plafond voor het elektrisch vermogen van de WP's in het venster: (100 % − reductie) × hun maximale vermogen (ontwerp ≈ 170 kWe). 50 % = max. ≈ 85 kWe, 100 % = uit. Vraagt een uur meer, dan levert het buffer de rest."},
         {"k": "strategie.congestie.adaptief", "label": "Adaptief: per dag begrenzen tot wat in het buffer past", "type": "bool", "status": "aanname", "alleen": "congestie", "geavanceerd": True},
     ]},
     {"id": "buffer", "titel": "Buffer", "velden": [
@@ -38,7 +38,9 @@ GROEPEN = [
     ]},
     {"id": "aansluiting", "titel": "Elektrische aansluiting", "velden": [
         {"k": "aansluiting.kva", "label": "Aansluitvermogen", "eenheid": "kVA", "type": "number", "min": 0, "max": 10000, "step": 5, "status": "bron",
-         "hulp": "Grens voor de WP's = kVA × cos φ − overige gebruikers. Wordt gerapporteerd (uren en kWe boven de grens); het model begrenst de WP's niet."},
+         "hulp": "Grens voor de WP's = kVA × cos φ − overige gebruikers. Zonder vinkje 'begrenzen' wordt een overschrijding alleen gemeld."},
+        {"k": "aansluiting.begrenzen", "label": "Warmtepompen begrenzen op de aansluiting", "type": "bool", "status": "aanname",
+         "hulp": "Aan: het WP-vermogen blijft elk uur onder de grens. Eerst wordt minder bijgeladen, dan levert het buffer bij; lukt dat niet, dan ontstaat een warmtetekort. Uit: alleen melden."},
         {"k": "aansluiting.cos_phi", "label": "Arbeidsfactor cos φ", "type": "number", "min": 0.5, "max": 1, "step": 0.01, "status": "aanname", "geavanceerd": True},
         {"k": "aansluiting.overig_kwe", "label": "Gereserveerd voor overige gebruikers", "eenheid": "kWe", "type": "number", "min": 0, "max": 5000, "step": 5, "status": "aanname", "geavanceerd": True,
          "hulp": "Bijvoorbeeld transportpompen, koelmachines, ventilatie en verlichting op dezelfde kabel."},
